@@ -121,28 +121,36 @@ void draw_game_grid(const char game_grid[GAME_GRID_LENGTH]) {
   draw_grid(game_grid, GAME_GRID_WIDTH, GAME_GRID_HEIGHT,0,0);
 }
 
-void rotate_piece(Piece* p) {
-  float rotcen_x = 1.5f; // rotation center
-  float rotcen_y = 1.5f; // rotation center
-  char rotated_piece_shape[PIECE_GRID_LENGTH];
-  for (int j = 0; j < PIECE_GRID_SIZE; j++) {
-    for (int i = 0; i < PIECE_GRID_SIZE; i++) {
-      float x = j - rotcen_y;
-      float y = -i + rotcen_x;
-      rotated_piece_shape[(int)(y + rotcen_y)*PIECE_GRID_SIZE + (int)(x + rotcen_x)] = p->grid[j*PIECE_GRID_SIZE + i];
-    }
-  }
-strcpy(p->grid, rotated_piece_shape);
-}
-
 bool check_overlap(Piece p, char game_grid[GAME_GRID_LENGTH]) {
   for (int j = 0; j < PIECE_GRID_SIZE; j++) {
     for (int i = 0; i < PIECE_GRID_SIZE; i++) {
       if (p.grid[j*PIECE_GRID_SIZE + i] == '0') continue;
-      if (game_grid[(j+p.y)*GAME_GRID_WIDTH + (i+p.x)] != '0') return true;
+      int xprime = i+p.x;
+      int yprime = j+p.y;
+      if (game_grid[(yprime)*GAME_GRID_WIDTH + (xprime)] != '0') return true;
+      if (xprime < 0) return true;
+      if (yprime < 0) return true;
+      if (xprime >= GAME_GRID_WIDTH) return true;
+      if (yprime >= GAME_GRID_HEIGHT) return true;
+      
     }
   }
   return false;
+}
+
+void rotate_piece(Piece* p, char game_grid[GAME_GRID_LENGTH]) {
+  float rotcen_x = 1.5f; // rotation center
+  float rotcen_y = 1.5f; // rotation center
+  Piece rotated_piece = {.x = p->x, .y = p->y};
+  for (int j = 0; j < PIECE_GRID_SIZE; j++) {
+    for (int i = 0; i < PIECE_GRID_SIZE; i++) {
+      float x = j - rotcen_y;
+      float y = -i + rotcen_x;
+      rotated_piece.grid[(int)(y + rotcen_y) * PIECE_GRID_SIZE + (int)(x + rotcen_x)] = p->grid[j * PIECE_GRID_SIZE + i];
+    }
+  }
+  if(check_overlap(rotated_piece, game_grid)) return;
+  strcpy(p->grid, rotated_piece.grid);
 }
 
 // true if piece is finished
@@ -173,13 +181,17 @@ void add_piece_to_gamegrid(Piece p, char game_grid[GAME_GRID_LENGTH]) {
   }
 }
 
+void move_to_next_piece(Piece* controlled_piece, char game_grid[GAME_GRID_LENGTH]) {
+    add_piece_to_gamegrid(*controlled_piece, game_grid);
+    controlled_piece->x = 0;
+    controlled_piece->y = 0;
+    controlled_piece->type = 'I';
+    set_piece_shape(controlled_piece, PIECE_I);
+}
+
 void update(){
   if (check_next_frame(controlled_piece, game_grid)) {
-    add_piece_to_gamegrid(controlled_piece, game_grid);
-    controlled_piece.x = 0;
-    controlled_piece.y = 0;
-    controlled_piece.type = 'I';
-    set_piece_shape(&controlled_piece, PIECE_I);
+    move_to_next_piece(&controlled_piece, game_grid);
   }
   else controlled_piece.y ++;
 }
@@ -207,10 +219,7 @@ int main(void)
         }
 
         if (IsKeyPressed(KEY_UP)) {
-            rotate_piece(&controlled_piece);
-            printf("UP-key event passed\n");
-            if (check_overlap(controlled_piece, game_grid)) printf("OVERLAP\n");
-            else printf("NOTHING\n");
+            rotate_piece(&controlled_piece, game_grid);
         }
         if (IsKeyPressed(KEY_DOWN)) {
             // smash piece down
@@ -218,9 +227,11 @@ int main(void)
 
         if (IsKeyPressed(KEY_LEFT)) {
             controlled_piece.x --;
+            if(check_overlap(controlled_piece, game_grid)) controlled_piece.x ++;
         }
         if (IsKeyPressed(KEY_RIGHT)) {
             controlled_piece.x ++;
+            if(check_overlap(controlled_piece, game_grid)) controlled_piece.x --;
         }
 
         // Draw
