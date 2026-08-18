@@ -1,9 +1,13 @@
 #include "raylib.h"
 #include "stdio.h"
 #include "string.h"
+#include "memory.h"
 
 #define SCREEN_WIDTH 1200
 #define SCREEN_HEIGHT 900
+
+#define FPS 60
+#define TIME_PER_UPDATE 0.5 // seconds
 
 #define PIECE_GRID_SIZE 4
 
@@ -29,6 +33,7 @@ enum {
 
 typedef struct Piece {
   int x, y;
+  char type;
   char grid[PIECE_GRID_LENGTH];
 } Piece;
 
@@ -54,7 +59,7 @@ char game_grid[GAME_GRID_LENGTH] =
     "0OOJJLL0"
     "SSSZZZZ0";
 
-Piece controlled_piece = {.x=1, .y=1, .grid = PIECE_T};
+Piece controlled_piece = {.x=1, .y=1, .type = 'Z', .grid = PIECE_Z};
 
 void set_piece_shape(Piece *piece, const char *shape){
     strcpy(piece->grid, shape);
@@ -66,7 +71,7 @@ Color color_from_id(char id)
 
     switch (id) {
         case '0':
-            color = BLACK;
+            color = (Color){0, 0, 0, 0};
             break;
         case 'I':
             color = SKYBLUE;
@@ -117,14 +122,66 @@ void draw_game_grid(const char game_grid[GAME_GRID_LENGTH]) {
 }
 
 void rotate_piece(Piece* p) {
+  float rotcen_x = 1.5f; // rotation center
+  float rotcen_y = 1.5f; // rotation center
   char rotated_piece_shape[PIECE_GRID_LENGTH];
   for (int j = 0; j < PIECE_GRID_SIZE; j++) {
     for (int i = 0; i < PIECE_GRID_SIZE; i++) {
-      int x = i;
-      int y = j;
-      rotated_piece_shape[y*PIECE_GRID_SIZE + x] = p->grid[j*PIECE_GRID_SIZE + i];
+      float x = j - rotcen_y;
+      float y = -i + rotcen_x;
+      rotated_piece_shape[(int)(y + rotcen_y)*PIECE_GRID_SIZE + (int)(x + rotcen_x)] = p->grid[j*PIECE_GRID_SIZE + i];
     }
   }
+strcpy(p->grid, rotated_piece_shape);
+}
+
+bool check_overlap(Piece p, char game_grid[GAME_GRID_LENGTH]) {
+  for (int j = 0; j < PIECE_GRID_SIZE; j++) {
+    for (int i = 0; i < PIECE_GRID_SIZE; i++) {
+      if (p.grid[j*PIECE_GRID_SIZE + i] == '0') continue;
+      if (game_grid[(j+p.y)*GAME_GRID_WIDTH + (i+p.x)] != '0') return true;
+    }
+  }
+  return false;
+}
+
+// true if piece is finished
+// false if falling
+bool check_next_frame(Piece p, char game_grid[GAME_GRID_LENGTH]) {
+  p.y += 1;
+  return check_overlap(p, game_grid);
+}
+
+bool piece_above_screen(Piece p, char game_grid[GAME_GRID_LENGTH]){
+
+}
+
+void clear_lines(char game_grid[GAME_GRID_LENGTH]) {
+
+}
+
+void move_rows_down(char game_grid[GAME_GRID_LENGTH]) {
+
+}
+
+void add_piece_to_gamegrid(Piece p, char game_grid[GAME_GRID_LENGTH]) {
+  for (int j = 0; j < PIECE_GRID_SIZE; j++) {
+    for (int i = 0; i < PIECE_GRID_SIZE; i++) {
+      if (p.grid[j*PIECE_GRID_SIZE + i] == '0') continue;
+      game_grid[(j+p.y)*GAME_GRID_WIDTH + (i+p.x)] = p.grid[j*PIECE_GRID_SIZE + i];
+    }
+  }
+}
+
+void update(){
+  if (check_next_frame(controlled_piece, game_grid)) {
+    add_piece_to_gamegrid(controlled_piece, game_grid);
+    controlled_piece.x = 0;
+    controlled_piece.y = 0;
+    controlled_piece.type = 'I';
+    set_piece_shape(&controlled_piece, PIECE_I);
+  }
+  else controlled_piece.y ++;
 }
 
 int main(void)
@@ -132,18 +189,39 @@ int main(void)
     const int screenWidth = SCREEN_WIDTH;
     const int screenHeight = SCREEN_HEIGHT;
 
-    InitWindow(screenWidth, screenHeight, "Elsys Tetris");
-    SetTargetFPS(60);
+    double time_since_update = 0;
 
-    float x = 100.0f;
+    InitWindow(screenWidth, screenHeight, "Elsys Tetris");
+    SetTargetFPS(FPS);
 
     while (!WindowShouldClose())
     {
-        // Update
-        x += 2.0f;
 
-        if (x > screenWidth + 50)
-            x = -50;
+        time_since_update += GetFrameTime();
+    printf("%f\n", time_since_update);
+
+        if (time_since_update >= TIME_PER_UPDATE)
+        {
+            time_since_update -= TIME_PER_UPDATE;
+            update();
+        }
+
+        if (IsKeyPressed(KEY_UP)) {
+            rotate_piece(&controlled_piece);
+            printf("UP-key event passed\n");
+            if (check_overlap(controlled_piece, game_grid)) printf("OVERLAP\n");
+            else printf("NOTHING\n");
+        }
+        if (IsKeyPressed(KEY_DOWN)) {
+            // smash piece down
+        }
+
+        if (IsKeyPressed(KEY_LEFT)) {
+            controlled_piece.x --;
+        }
+        if (IsKeyPressed(KEY_RIGHT)) {
+            controlled_piece.x ++;
+        }
 
         // Draw
         BeginDrawing();
@@ -152,30 +230,10 @@ int main(void)
 
         draw_piece(controlled_piece);
 
-        ClearBackground(RAYWHITE);
+        ClearBackground(BLACK);
 
-        // // Rectangle
-        // DrawRectangle(50, 50, 200, 100, BLUE);
-        //
-        // // Circle
-        // DrawCircle(400, 100, 50, RED);
-        //
-        // // Line
-        // DrawLine(50, 200, 750, 200, DARKGRAY);
-        //
-        // // Triangle
-        // DrawTriangle(
-        //     (Vector2){600, 50},
-        //     (Vector2){550, 150},
-        //     (Vector2){650, 150},
-        //     GREEN
-        // );
-        //
-        // // Moving circle
-        // DrawCircle((int)x, 300, 30, PURPLE);
-        //
-        // // Text
-        // DrawText("Hello, raylib!", 50, 350, 30, DARKGRAY);
+        // Text
+        DrawText("Hello, raylib!", 50, 350, 30, DARKGRAY);
         DrawText("Press ESC to exit", 50, 390, 20, GRAY);
 
         EndDrawing();
