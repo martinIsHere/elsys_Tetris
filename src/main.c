@@ -2,6 +2,8 @@
 #include "stdio.h"
 #include "string.h"
 #include "memory.h"
+#include <stdlib.h>
+#include <time.h>
 
 #define SCREEN_WIDTH 1200
 #define SCREEN_HEIGHT 900
@@ -30,6 +32,16 @@ enum {
 #define PIECE_Z    "0000ZZ000ZZ00000"
 #define PIECE_T    "00000T00TTT00000"
 #define PIECE_NULL "0000000000000000"
+
+const char *piece_shapes[] = {
+    PIECE_I,
+    PIECE_O,
+    PIECE_T,
+    PIECE_S,
+    PIECE_Z,
+    PIECE_J,
+    PIECE_L
+};
 
 typedef struct Piece {
   int x, y;
@@ -185,8 +197,10 @@ void move_to_next_piece(Piece* controlled_piece, char game_grid[GAME_GRID_LENGTH
     add_piece_to_gamegrid(*controlled_piece, game_grid);
     controlled_piece->x = 0;
     controlled_piece->y = 0;
-    controlled_piece->type = 'I';
-    set_piece_shape(controlled_piece, PIECE_I);
+    int index = rand() % 7;
+
+    controlled_piece->type = "IOTSZJL"[index];
+    set_piece_shape(controlled_piece, piece_shapes[index]);
 }
 
 void update(){
@@ -198,6 +212,7 @@ void update(){
 
 int main(void)
 {
+    srand(time(NULL)); // seed time for RNG
     const int screenWidth = SCREEN_WIDTH;
     const int screenHeight = SCREEN_HEIGHT;
 
