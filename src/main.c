@@ -71,11 +71,14 @@ char game_grid[GAME_GRID_LENGTH] =
     "0OOJJLL0"
     "SSSZZZZ0";
 
-Piece controlled_piece = {.x=1, .y=1, .type = 'Z', .grid = PIECE_Z};
+Piece controlled_piece = {.x=2, .y=-3, .type = 'Z', .grid = PIECE_Z};
 
 void set_piece_shape(Piece *piece, const char *shape){
     strcpy(piece->grid, shape);
 }
+
+
+bool updating = true;
 
 Color color_from_id(char id)
 {
@@ -139,11 +142,11 @@ bool check_overlap(Piece p, char game_grid[GAME_GRID_LENGTH]) {
       if (p.grid[j*PIECE_GRID_SIZE + i] == '0') continue;
       int xprime = i+p.x;
       int yprime = j+p.y;
-      if (game_grid[(yprime)*GAME_GRID_WIDTH + (xprime)] != '0') return true;
+      if (yprime < 0) continue;
       if (xprime < 0) return true;
-      if (yprime < 0) return true;
       if (xprime >= GAME_GRID_WIDTH) return true;
       if (yprime >= GAME_GRID_HEIGHT) return true;
+      if (game_grid[(yprime)*GAME_GRID_WIDTH + (xprime)] != '0') return true;
       
     }
   }
@@ -176,38 +179,61 @@ bool piece_above_screen(Piece p, char game_grid[GAME_GRID_LENGTH]){
 
 }
 
+void delete_row(int row, char game_grid[GAME_GRID_LENGTH])
+
+void move_rows_down(int row, char game_grid[GAME_GRID_LENGTH]) {
+  
+}
+
 void clear_lines(char game_grid[GAME_GRID_LENGTH]) {
-
-}
-
-void move_rows_down(char game_grid[GAME_GRID_LENGTH]) {
-
-}
-
-void add_piece_to_gamegrid(Piece p, char game_grid[GAME_GRID_LENGTH]) {
-  for (int j = 0; j < PIECE_GRID_SIZE; j++) {
-    for (int i = 0; i < PIECE_GRID_SIZE; i++) {
-      if (p.grid[j*PIECE_GRID_SIZE + i] == '0') continue;
-      game_grid[(j+p.y)*GAME_GRID_WIDTH + (i+p.x)] = p.grid[j*PIECE_GRID_SIZE + i];
+  for (int row = 0; row < GAME_GRID_HEIGHT; row++) {
+    for (int i = 0; i < GAME_GRID_WIDTH; i ++) {
+      if(game_grid[row*GAME_GRID_WIDTH + i] == '0') break;
+      if (i == GAME_GRID_WIDTH) delete_row(row, game_grid);
+      move_rows_down(row, game_grid);
     }
   }
 }
 
-void move_to_next_piece(Piece* controlled_piece, char game_grid[GAME_GRID_LENGTH]) {
-    add_piece_to_gamegrid(*controlled_piece, game_grid);
-    controlled_piece->x = 0;
-    controlled_piece->y = 0;
+// true if lost, false if nothing
+bool add_piece_to_gamegrid(Piece p, char game_grid[GAME_GRID_LENGTH]) {
+  for (int j = 0; j < PIECE_GRID_SIZE; j++) {
+    for (int i = 0; i < PIECE_GRID_SIZE; i++) {
+      if (p.grid[j*PIECE_GRID_SIZE + i] == '0') continue;
+      if (j+p.y < 0) return true;
+      if (i+p.x < 0) continue;
+      if (i+p.x >= GAME_GRID_WIDTH) continue;
+      if (j+p.y >= GAME_GRID_HEIGHT) continue;
+      game_grid[(j+p.y)*GAME_GRID_WIDTH + (i+p.x)] = p.grid[j*PIECE_GRID_SIZE + i];
+    }
+  }
+  return false;
+}
+
+// true if lost, false if nothing
+bool move_to_next_piece(Piece* controlled_piece, char game_grid[GAME_GRID_LENGTH]) {
+    if(add_piece_to_gamegrid(*controlled_piece, game_grid)) return true;
+    controlled_piece->x = 2;
+    controlled_piece->y = -3;
     int index = rand() % 7;
 
     controlled_piece->type = "IOTSZJL"[index];
     set_piece_shape(controlled_piece, piece_shapes[index]);
+    return false;
 }
 
 void update(){
   if (check_next_frame(controlled_piece, game_grid)) {
-    move_to_next_piece(&controlled_piece, game_grid);
+    if (move_to_next_piece(&controlled_piece, game_grid)) updating = false;
   }
   else controlled_piece.y ++;
+}
+
+void smash(Piece *p, char game_grid[GAME_GRID_LENGTH]){
+  while (!check_next_frame(*p, game_grid)) {
+    p->y++;
+  }
+  if (move_to_next_piece(p, game_grid)) updating = false;
 }
 
 int main(void)
@@ -223,30 +249,32 @@ int main(void)
 
     while (!WindowShouldClose())
     {
+        if (updating) {
 
-        time_since_update += GetFrameTime();
-    printf("%f\n", time_since_update);
 
-        if (time_since_update >= TIME_PER_UPDATE)
-        {
-            time_since_update -= TIME_PER_UPDATE;
-            update();
-        }
+          time_since_update += GetFrameTime();
 
-        if (IsKeyPressed(KEY_UP)) {
-            rotate_piece(&controlled_piece, game_grid);
-        }
-        if (IsKeyPressed(KEY_DOWN)) {
-            // smash piece down
-        }
+          if (time_since_update >= TIME_PER_UPDATE && updating)
+          {
+              time_since_update -= TIME_PER_UPDATE;
+              update();
+          }
 
-        if (IsKeyPressed(KEY_LEFT)) {
-            controlled_piece.x --;
-            if(check_overlap(controlled_piece, game_grid)) controlled_piece.x ++;
-        }
-        if (IsKeyPressed(KEY_RIGHT)) {
-            controlled_piece.x ++;
-            if(check_overlap(controlled_piece, game_grid)) controlled_piece.x --;
+          if (IsKeyPressed(KEY_UP)) {
+              rotate_piece(&controlled_piece, game_grid);
+          }
+          if (IsKeyPressed(KEY_DOWN)) {
+              smash(&controlled_piece, game_grid);
+          }
+
+          if (IsKeyPressed(KEY_LEFT)) {
+              controlled_piece.x --;
+              if(check_overlap(controlled_piece, game_grid)) controlled_piece.x ++;
+          }
+          if (IsKeyPressed(KEY_RIGHT)) {
+              controlled_piece.x ++;
+              if(check_overlap(controlled_piece, game_grid)) controlled_piece.x --;
+          }
         }
 
         // Draw
