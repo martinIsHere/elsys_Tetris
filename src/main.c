@@ -11,9 +11,11 @@
 #define FPS 60
 #define DEFAULT_TIME_PER_UPDATE 0.5 // seconds
 #define DROP_INTERVAL_DECREMENT_PER_LEVEL 0.05 // seconds
+#define MINIMUM_DROP_INTERVAL 0.1 // seconds
+#define CLEARS_PER_LEVEL 5
 
 #define SCORE_SLOW_FALL 1
-#define SCORE_FAST_FALL 10
+#define SCORE_FAST_FALL 2
 #define SCORE_1_LINE 100
 #define SCORE_2_LINE 200
 #define SCORE_3_LINE 400
@@ -25,6 +27,7 @@
 #define GAME_GRID_HEIGHT 20
 
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
+#define MAX(a, b) ((a) > (b) ? (a) : (b))
 
 enum {
     PIECE_GRID_LENGTH = PIECE_GRID_SIZE*PIECE_GRID_SIZE + 1, // +1 for nullterminator
@@ -107,6 +110,7 @@ void randomize_piece_shape(Piece* p) {
 
     p->type = "IOTSZJL"[index];
     set_piece_shape(p, piece_shapes[index]);
+    set_piece_shape(p, PIECE_I);
 }
 
 Gamestate gamestate;
@@ -146,30 +150,48 @@ Color color_from_id(Brick id)
 }
 
 // ============================================================
-// DRAW
+// SCORE & STATS
 // ============================================================
 
-void draw_brick (const int x, const int y, const Brick id) {
-  int padding = 2; // pixels
-  DrawRectangle(x * BRICK_SIZE_PIXELS + padding, y * BRICK_SIZE_PIXELS + padding, BRICK_SIZE_PIXELS-padding, BRICK_SIZE_PIXELS - padding, color_from_id(id));
+void update_game_stats() {
+  game_stats.level = (int)(game_stats.lines_cleared / CLEARS_PER_LEVEL);
+  game_stats.drop_interval = DEFAULT_TIME_PER_UPDATE - DROP_INTERVAL_DECREMENT_PER_LEVEL*((float)game_stats.level);
+  game_stats.drop_interval = MAX(MINIMUM_DROP_INTERVAL, game_stats.drop_interval);
+  printf("level: %d", game_stats.level);
+  printf("drop_interval: %f", game_stats.drop_interval);
 }
 
-void draw_grid(const Brick* const grid, const size_t width, const size_t height, const int x, const int y) {
-    for (int j = 0; j < height; j++) {
-        for (int i = 0; i < width; i++) {
-          draw_brick(i+x,j+y,grid[width*j+i]);
-      }
+void score_slow_fall(void) {
+  game_stats.score += SCORE_SLOW_FALL;
+}
+
+void score_fast_fall(void) {
+  game_stats.score += SCORE_FAST_FALL;
+}
+
+void score_line_clear(const int lines_cleared) {
+  game_stats.lines_cleared += lines_cleared;
+  update_game_stats();
+  
+  switch(lines_cleared) {
+    case 0:
+      break;
+    case 1:
+      game_stats.score+=SCORE_1_LINE;
+    case 2:
+      game_stats.score+=SCORE_2_LINE;
+      break;
+    case 3:
+      game_stats.score+=SCORE_3_LINE;
+      break;
+    case 4:
+      game_stats.score+=SCORE_4_LINE;
+      break;
+    default:
+      break;
   }
-}
 
-void draw_piece(const Piece p) {
-  draw_grid(p.grid, PIECE_GRID_SIZE, PIECE_GRID_SIZE, p.x, p.y);
 }
-
-void draw_game_grid(const Brick game_grid[GAME_GRID_LENGTH]) {
-  draw_grid(game_grid, GAME_GRID_WIDTH, GAME_GRID_HEIGHT,0,0);
-}
-
 
 // ============================================================
 // LOGIC & MECHANICS
@@ -234,7 +256,8 @@ void move_rows_down(int row, Brick game_grid[GAME_GRID_LENGTH]) {
   }
 }
 
-void clear_lines(Brick game_grid[GAME_GRID_LENGTH]) {
+int clear_lines(Brick game_grid[GAME_GRID_LENGTH]) {
+  int lines_cleared = 0;
   for (int row = 0; row < GAME_GRID_HEIGHT; row++) {
     for (int i = 0; i < GAME_GRID_WIDTH; i ++) {
       if(game_grid[row*GAME_GRID_WIDTH + i] == '0') break; // break if not a brick
@@ -242,11 +265,12 @@ void clear_lines(Brick game_grid[GAME_GRID_LENGTH]) {
         delete_row(row, game_grid);
         move_rows_down(row, game_grid); // move rows above down
         printf("clearing lines\n");
+        lines_cleared++;
         row = 0; i = 0; // restart
       } // delete row if the last tile is a brick
-            
     }
   }
+  return lines_cleared;
 }
 
 // true if lost, false if nothing
@@ -261,7 +285,9 @@ bool add_piece_to_gamegrid(Piece p, Brick game_grid[GAME_GRID_LENGTH]) {
       game_grid[(j+p.y)*GAME_GRID_WIDTH + (i+p.x)] = p.grid[j*PIECE_GRID_SIZE + i];
     }
   }
-  clear_lines(game_grid);
+  int lines_cleared = clear_lines(game_grid);
+  printf("cleared %d lines", lines_cleared);
+  score_line_clear(lines_cleared);
   return false;
 }
 
@@ -277,50 +303,67 @@ bool move_to_next_piece(Piece* controlled_piece, Brick game_grid[GAME_GRID_LENGT
 void smash(Piece *p, Brick game_grid[GAME_GRID_LENGTH]){
   while (!check_next_frame(*p, game_grid)) {
     p->y++;
+    score_fast_fall();
   }
   if (move_to_next_piece(p, game_grid)) gamestate = GAME_LOST;
 }
-//
+
 // ============================================================
-// SCORE & STATS
+// DRAW
 // ============================================================
 
-void update_game_stats() {
-  game_stats.level = (int)(game_stats.lines_cleared / 10);
-  game_stats.drop_interval = DEFAULT_TIME_PER_UPDATE + DROP_INTERVAL_DECREMENT_PER_LEVEL*((float)game_stats.level);
-}
-
-void score_slow_fall(void) {
-  game_stats.score += SCORE_SLOW_FALL;
-}
-
-void score_fast_fall(void) {
-  game_stats.score += SCORE_FAST_FALL;
-}
-
-void score_line_clear(const int lines_cleared) {
-  game_stats.lines_cleared += lines_cleared;
-  update_game_stats();
-  
-  switch(lines_cleared) {
-    case 0:
-      break;
-    case 1:
-      game_stats.score+=(int)(SCORE_1_LINE*game_stats.level);
-    case 2:
-      game_stats.score+=(int)(SCORE_2_LINE*game_stats.level);
-      break;
-    case 3:
-      game_stats.score+=(int)(SCORE_3_LINE*game_stats.level);
-      break;
-    case 4:
-      game_stats.score+=(int)(SCORE_4_LINE*game_stats.level);
-      break;
-    default:
-      break;
+void draw_brick (const int x, const int y, const Brick id, bool ghost) {
+  int padding = 2; // pixels
+  if (ghost) {
+    if (id == '0') return;
+    DrawRectangle(x * BRICK_SIZE_PIXELS + padding, y * BRICK_SIZE_PIXELS + padding, BRICK_SIZE_PIXELS-padding, BRICK_SIZE_PIXELS - padding, (Color){255,255,255,100});
+    return;
   }
-
+  DrawRectangle(x * BRICK_SIZE_PIXELS + padding, y * BRICK_SIZE_PIXELS + padding, BRICK_SIZE_PIXELS-padding, BRICK_SIZE_PIXELS - padding, color_from_id(id));
 }
+
+void draw_grid(const Brick* const grid, const size_t width, const size_t height, const int x, const int y, bool ghost) {
+    for (int j = 0; j < height; j++) {
+        for (int i = 0; i < width; i++) {
+          draw_brick(i+x,j+y,grid[width*j+i], ghost);
+      }
+  }
+}
+
+void draw_piece(const Piece p, bool ghost) {
+  draw_grid(p.grid, PIECE_GRID_SIZE, PIECE_GRID_SIZE, p.x, p.y, ghost);
+}
+
+void draw_game_grid(const Brick game_grid[GAME_GRID_LENGTH]) {
+  draw_grid(game_grid, GAME_GRID_WIDTH, GAME_GRID_HEIGHT,0,0, false);
+}
+
+void draw_drop_line(const Piece p) {
+  int x_grid = p.x+(int)(PIECE_GRID_SIZE/2);
+  int y_grid = p.y+(int)(PIECE_GRID_SIZE/2);
+  DrawLine(x_grid*BRICK_SIZE_PIXELS, y_grid*BRICK_SIZE_PIXELS, x_grid*BRICK_SIZE_PIXELS, GAME_GRID_HEIGHT*BRICK_SIZE_PIXELS, WHITE);
+}
+
+void draw_borders() {
+  DrawRectangleLinesEx(
+      (Rectangle){
+          0,
+          0,
+          GAME_GRID_WIDTH * BRICK_SIZE_PIXELS,
+          GAME_GRID_HEIGHT * BRICK_SIZE_PIXELS
+      },
+      4,
+      WHITE
+  );
+}
+
+void draw_prediction_piece(Piece p) {
+  while (!check_next_frame(p, game_grid)) {
+    p.y++;
+  }
+  draw_piece(p, true);
+}
+
 
 // ============================================================
 // update & main
@@ -387,7 +430,13 @@ int main(void)
 
         draw_game_grid(game_grid);
 
-        draw_piece(controlled_piece);
+        draw_borders();
+
+        draw_drop_line(controlled_piece);
+
+        draw_prediction_piece(controlled_piece);
+
+        draw_piece(controlled_piece, false);
 
         ClearBackground(BLACK);
 
