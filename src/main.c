@@ -24,7 +24,7 @@
 #define PIECE_GRID_SIZE 4
 
 #define GAME_GRID_WIDTH 8
-#define GAME_GRID_HEIGHT 10
+#define GAME_GRID_HEIGHT 30
 
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
@@ -97,7 +97,6 @@ void randomize_piece_shape(Piece* p) {
 
     p->type = "IOTSZJL"[index];
     set_piece_shape(p, piece_shapes[index]);
-    set_piece_shape(p, PIECE_I);
 }
 
 void zero_grid(Brick* grid, int length) {
