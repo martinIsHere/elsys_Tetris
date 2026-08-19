@@ -518,6 +518,8 @@ void draw() {
   EndDrawing();
 }
 
+void animate_line_clear(void) {}
+
 void reset(void) {
   zero_grid(game_grid, GAME_GRID_LENGTH);
 
