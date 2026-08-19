@@ -23,8 +23,8 @@
 
 #define PIECE_GRID_SIZE 4
 
-#define GAME_GRID_WIDTH 8
-#define GAME_GRID_HEIGHT 30
+#define GAME_GRID_WIDTH 10
+#define GAME_GRID_HEIGHT 20
 
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
