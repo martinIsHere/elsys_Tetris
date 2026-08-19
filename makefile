@@ -1,14 +1,15 @@
 CC      = gcc
 CFLAGS  = -Wall -Iinclude
-LDFLAGS = -Llib -lraylib -lgdi32 -lwinmm
+LDFLAGS = -Llib -lraylib -lgdi32 -lwinmm -mwindows
 
 TARGET  = bin\elsys_Tetris.exe
 SRC     = src/main.c
+RESOBJ  = resource.o
 
 all: $(TARGET)
 
 $(TARGET): $(SRC)
-	$(CC) $(SRC) -o $@ $(CFLAGS) $(LDFLAGS)
+	$(CC) $(SRC) $(RESOBJ) -o $@ $(CFLAGS) $(LDFLAGS)
 
 run: $(TARGET)
 	./$(TARGET)
