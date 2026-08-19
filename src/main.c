@@ -8,6 +8,11 @@
 #define SCREEN_WIDTH 1200
 #define SCREEN_HEIGHT 900
 
+#define ENABLE_SHAKE true
+#define ENABLE_LIGHT true
+#define ENABLE_FALL_LINE true
+#define ENABLE_PREDICTION true
+
 #define FPS 60
 #define DEFAULT_TIME_PER_UPDATE 0.5 // seconds
 #define DROP_INTERVAL_DECREMENT_PER_LEVEL 0.05 // seconds
@@ -64,7 +69,6 @@ const Brick *piece_shapes[] = {
 
 typedef struct Piece {
   int x, y;
-  Brick type;
   Brick grid[PIECE_GRID_LENGTH];
 } Piece;
 
@@ -79,7 +83,8 @@ GameStats game_stats;
 
 Brick game_grid[GAME_GRID_LENGTH];
 
-Piece controlled_piece = {.x=2, .y=-3, .type = 'S', .grid = PIECE_S};
+Piece controlled_piece;
+Brick next_piece_grid[PIECE_GRID_LENGTH];
 
 // position of the tetris playing area in pixels
 int game_viewport_x;
@@ -88,19 +93,23 @@ int game_viewport_y;
 int text_anchor_x;
 int text_anchor_y;
 
+int next_piece_anchor_x;
+int next_piece_anchor_y;
+
+double time_since_update;
+
 void set_piece_shape(Piece *piece, const Brick *shape){
     strcpy(piece->grid, shape);
 }
 
-void randomize_piece_shape(Piece* p) {
+void randomize_shape(Brick *grid) {
     int index = rand() % 7;
 
-    p->type = "IOTSZJL"[index];
-    set_piece_shape(p, piece_shapes[index]);
+    strcpy(grid, piece_shapes[index]);
 }
 
 void zero_grid(Brick* grid, int length) {
-  for (int i = 0; i < length; i++) {
+  for (int i = 0; i < length-1; i++) { // -1 to not destroy \0
     grid[i] = '0';
   }
 }
@@ -142,6 +151,46 @@ Color color_from_id(Brick id)
 }
 
 // ============================================================
+// SHADER
+// ============================================================
+
+Shader glow_shader;
+RenderTexture2D game_target;
+
+const char *glow_shader_code =
+"#version 330\n"
+
+"in vec2 fragTexCoord;\n"
+"in vec4 fragColor;\n"
+
+"uniform sampler2D texture0;\n"
+"uniform vec2 resolution;\n"
+
+"out vec4 finalColor;\n"
+
+"void main()\n"
+"{\n"
+"    vec2 texel = 1.0 / resolution;\n"
+
+"    vec4 center = texture(texture0, fragTexCoord);\n"
+
+"    vec4 glow = vec4(0.0);\n"
+"    const float GLOW_RADIUS = 6.0;\n"
+"    glow += texture(texture0, fragTexCoord + texel * vec2(-GLOW_RADIUS, -GLOW_RADIUS));\n"
+"    glow += texture(texture0, fragTexCoord + texel * vec2( 0.0,        -GLOW_RADIUS));\n"
+"    glow += texture(texture0, fragTexCoord + texel * vec2( GLOW_RADIUS, -GLOW_RADIUS));\n"
+"    glow += texture(texture0, fragTexCoord + texel * vec2(-GLOW_RADIUS,  0.0));\n"
+"    glow += texture(texture0, fragTexCoord + texel * vec2( GLOW_RADIUS,  0.0));\n"
+"    glow += texture(texture0, fragTexCoord + texel * vec2(-GLOW_RADIUS,  GLOW_RADIUS));\n"
+"    glow += texture(texture0, fragTexCoord + texel * vec2( 0.0,         GLOW_RADIUS));\n"
+"    glow += texture(texture0, fragTexCoord + texel * vec2( GLOW_RADIUS,  GLOW_RADIUS));\n"
+
+"    glow /= 8.0;\n"
+
+"    finalColor = center + glow * 0.35;\n"
+"}\n";
+
+// ============================================================
 // SCORE & STATS
 // ============================================================
 
@@ -168,6 +217,7 @@ void score_line_clear(const int lines_cleared) {
       break;
     case 1:
       game_stats.score+=SCORE_1_LINE;
+      break;
     case 2:
       game_stats.score+=SCORE_2_LINE;
       break;
@@ -283,7 +333,7 @@ bool move_to_next_piece(Piece* controlled_piece, Brick game_grid[GAME_GRID_LENGT
     if(add_piece_to_gamegrid(*controlled_piece, game_grid)) return true;
     controlled_piece->x = 2;
     controlled_piece->y = -3;
-    randomize_piece_shape(controlled_piece);
+    randomize_shape(controlled_piece->grid);
     return false;
 }
 
@@ -295,11 +345,18 @@ void smash(Piece *p, Brick game_grid[GAME_GRID_LENGTH]){
   if (move_to_next_piece(p, game_grid)) gamestate = GAME_LOST;
 }
 
+void switch_controlled_piece() {
+  Brick buffer [PIECE_GRID_LENGTH];
+  strcpy(buffer, controlled_piece.grid);
+  strcpy(controlled_piece.grid, next_piece_grid);
+  strcpy(next_piece_grid, buffer);
+}
+
 // ============================================================
 // DRAW
 // ============================================================
 
-void draw_brick (const int x_in, const int y_in, const Brick id, bool ghost) {
+void draw_brick_on_grid (const int x_in, const int y_in, const Brick id, bool ghost) {
   int padding = 2; // pixels
   int x = x_in * BRICK_SIZE_PIXELS + game_viewport_x + padding;
   int y = y_in * BRICK_SIZE_PIXELS + game_viewport_y + padding;
@@ -313,20 +370,32 @@ void draw_brick (const int x_in, const int y_in, const Brick id, bool ghost) {
   DrawRectangle(x, y, width,height, color_from_id(id));
 }
 
-void draw_grid(const Brick* const grid, const size_t width, const size_t height, const int x, const int y, bool ghost) {
+void draw_brick (const int x, const int y, const int width, const int height, const Brick id) {
+  DrawRectangle(x, y, width,height, color_from_id(id));
+}
+
+void draw_grid_on_grid(const Brick* const grid, const size_t width, const size_t height, const int x, const int y, bool ghost) {
     for (int j = 0; j < height; j++) {
         for (int i = 0; i < width; i++) {
-          draw_brick(i+x,j+y,grid[width*j+i], ghost);
+          draw_brick_on_grid(i+x,j+y,grid[width*j+i], ghost);
       }
   }
 }
 
-void draw_piece(const Piece p, bool ghost) {
-  draw_grid(p.grid, PIECE_GRID_SIZE, PIECE_GRID_SIZE, p.x, p.y, ghost);
+void draw_grid(const Brick* const grid, const size_t width, const size_t height, const size_t size_pixels, const int x, const int y) {
+    for (int j = 0; j < height; j++) {
+        for (int i = 0; i < width; i++) {
+          draw_brick(i*size_pixels+x,j*size_pixels+y, size_pixels, size_pixels, grid[width*j+i]);
+      }
+  }
+}
+
+void draw_piece_on_grid(const Piece p, bool ghost) {
+  draw_grid_on_grid(p.grid, PIECE_GRID_SIZE, PIECE_GRID_SIZE, p.x, p.y, ghost);
 }
 
 void draw_game_grid(const Brick game_grid[GAME_GRID_LENGTH]) {
-  draw_grid(game_grid, GAME_GRID_WIDTH, GAME_GRID_HEIGHT,0,0, false);
+  draw_grid_on_grid(game_grid, GAME_GRID_WIDTH, GAME_GRID_HEIGHT,0,0, false);
 }
 
 void draw_drop_line(const Piece p) {
@@ -356,9 +425,12 @@ void draw_prediction_piece(Piece p) {
   while (!check_next_frame(p, game_grid)) {
     p.y++;
   }
-  draw_piece(p, true);
+  draw_piece_on_grid(p, true);
 }
 
+void draw_next_piece () {
+  draw_grid(next_piece_grid, PIECE_GRID_SIZE, PIECE_GRID_SIZE, (int)(BRICK_SIZE_PIXELS*1.25), next_piece_anchor_x, next_piece_anchor_y);
+}
 
 // ============================================================
 // update & main
@@ -372,6 +444,108 @@ void update(){
   score_slow_fall();
 }
 
+void draw() {
+    BeginTextureMode(game_target);
+
+    // general
+    ClearBackground((Color){20,20,20,255});
+
+    draw_game_grid(game_grid);
+
+    draw_borders();
+
+    if (ENABLE_FALL_LINE)
+        draw_drop_line(controlled_piece);
+
+    if (ENABLE_PREDICTION)
+        draw_prediction_piece(controlled_piece);
+
+    draw_piece_on_grid(controlled_piece, false);
+
+    // text
+    if (gamestate == GAME_LOST)
+        DrawText("YOU LOST", text_anchor_x + 50, text_anchor_y + 350, 30, RED);
+
+    DrawText("Press ESC to exit",
+             text_anchor_x + 50,
+             text_anchor_y + 10,
+             20,
+             GRAY);
+
+    DrawText(TextFormat("Score: %d", game_stats.score),
+             text_anchor_x + 50,
+             text_anchor_y + 50,
+             30,
+             YELLOW);
+
+    DrawText(TextFormat("LEVEL: %d", game_stats.level),
+             text_anchor_x + 50,
+             text_anchor_y + 80,
+             30,
+             YELLOW);
+
+    // next piece
+    draw_next_piece();
+
+    EndTextureMode();
+
+    // draw texture with shader to window
+    BeginDrawing();
+
+    ClearBackground(BLACK);
+
+    if (ENABLE_LIGHT) {
+        BeginShaderMode(glow_shader);
+
+        DrawTextureRec(
+            game_target.texture,
+            (Rectangle){
+                0,
+                0,
+                (float)game_target.texture.width,
+                -(float)game_target.texture.height
+            },
+            (Vector2){0, 0},
+            WHITE
+        );
+
+        EndShaderMode();
+    }
+    else {
+        DrawTextureRec(
+            game_target.texture,
+            (Rectangle){
+                0,
+                0,
+                (float)game_target.texture.width,
+                -(float)game_target.texture.height
+            },
+            (Vector2){0, 0},
+            WHITE
+        );
+    }
+
+    EndDrawing();
+}
+
+void reset(void) {
+    zero_grid(game_grid, GAME_GRID_LENGTH);
+
+    controlled_piece.x = 2;
+    controlled_piece.y = -3;
+    randomize_shape(controlled_piece.grid);
+    randomize_shape(next_piece_grid);
+
+    game_stats.score = 0;
+    game_stats.drop_interval = DEFAULT_TIME_PER_UPDATE;
+    game_stats.level = 0;
+    game_stats.lines_cleared = 0;
+
+    time_since_update = 0;
+
+    gamestate = GAME_PLAYING;
+}
+
 int main(void)
 {
     srand(time(NULL)); // seed time for RNG
@@ -380,7 +554,10 @@ int main(void)
 
     zero_grid(game_grid, GAME_GRID_LENGTH);
 
-    double time_since_update = 0;
+    controlled_piece.x = 2;
+    controlled_piece.y = -3;
+
+    time_since_update = 0;
     gamestate = GAME_PLAYING;
     game_stats.score = 0;
     game_stats.level = 0;
@@ -388,16 +565,37 @@ int main(void)
     game_stats.drop_interval = DEFAULT_TIME_PER_UPDATE;
 
 
-    game_viewport_x = 100;
+    game_viewport_x = 300;
     game_viewport_y = 0;
 
     text_anchor_x = game_viewport_x + GAME_GRID_WIDTH * BRICK_SIZE_PIXELS;
     text_anchor_y = game_viewport_y;
 
-    randomize_piece_shape(&controlled_piece);
+    next_piece_anchor_x = 20;
+    next_piece_anchor_y = 100;
+
+    randomize_shape(controlled_piece.grid);
+    randomize_shape(next_piece_grid);
 
     InitWindow(screenWidth, screenHeight, "Elsys Tetris");
     SetTargetFPS(FPS);
+
+    game_target = LoadRenderTexture(screenWidth, screenHeight);
+    glow_shader = LoadShaderFromMemory(NULL, glow_shader_code);
+
+    int resolution_location = GetShaderLocation(glow_shader, "resolution");
+
+    Vector2 resolution = {
+        (float)screenWidth,
+        (float)screenHeight
+    };
+
+    SetShaderValue(
+        glow_shader,
+        resolution_location,
+        &resolution,
+        SHADER_UNIFORM_VEC2
+    );
 
     while (!WindowShouldClose())
     {
@@ -427,31 +625,22 @@ int main(void)
               controlled_piece.x ++;
               if(check_overlap(controlled_piece, game_grid)) controlled_piece.x --;
           }
+          if (IsKeyPressed(KEY_C)) {
+            switch_controlled_piece();
+          }
+          if (IsKeyPressed(KEY_R)) {
+              reset();
+          }
         }
 
         // Draw
-        BeginDrawing();
+        draw();
 
-        draw_game_grid(game_grid);
 
-        draw_borders();
-
-        draw_drop_line(controlled_piece);
-
-        draw_prediction_piece(controlled_piece);
-
-        draw_piece(controlled_piece, false);
-
-        ClearBackground(BLACK);
-
-        // Text
-        if (gamestate == GAME_LOST) DrawText("YOU LOST", text_anchor_x + 50, text_anchor_y + 350, 30, RED);
-        DrawText("Press ESC to exit", text_anchor_x + 50, text_anchor_y + 10, 20, GRAY);
-        DrawText(TextFormat("Score: %d", game_stats.score), text_anchor_x + 50, text_anchor_y + 50, 30, YELLOW);
-        DrawText(TextFormat("LEVEL: %d", game_stats.level), text_anchor_x + 50, text_anchor_y + 80, 30, YELLOW);
-
-        EndDrawing();
     }
+
+    UnloadShader(glow_shader);
+    UnloadRenderTexture(game_target);
 
     CloseWindow();
 
