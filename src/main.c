@@ -10,6 +10,7 @@
 
 #define ENABLE_SHAKE true
 #define ENABLE_LIGHT true
+#define ENABLE_LINE_CLEAR_ANIMATION true
 #define ENABLE_FALL_LINE true
 #define ENABLE_PREDICTION true
 
@@ -42,7 +43,9 @@ enum {
 
 enum {
   GAME_PLAYING,
-  GAME_LOST
+  GAME_LOST,
+  GAME_ANIMATION_LINE_CLEAR1,
+  GAME_ANIMATION_SMASH,
 };
 
 typedef int Gamestate;
