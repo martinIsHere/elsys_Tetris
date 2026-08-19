@@ -5,7 +5,7 @@
 #include <stdlib.h>
 #include <time.h>
 
-#define SCREEN_WIDTH 1200
+#define SCREEN_WIDTH 1100
 #define SCREEN_HEIGHT 900
 
 #define ENABLE_SHAKE true
