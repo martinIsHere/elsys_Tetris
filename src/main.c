@@ -5,6 +5,15 @@
 #include "stdio.h"
 #include "string.h"
 
+/*
+* TODO:
+* bug when switching held piece while moving into wall/at wall. *
+* add music
+* add soundfx
+* add animation *
+*
+*/
+
 #define SCREEN_WIDTH 1100
 #define SCREEN_HEIGHT 900
 
