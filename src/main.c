@@ -24,7 +24,7 @@
 #define PIECE_GRID_SIZE 4
 
 #define GAME_GRID_WIDTH 8
-#define GAME_GRID_HEIGHT 20
+#define GAME_GRID_HEIGHT 10
 
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
@@ -77,29 +77,16 @@ typedef struct GameStats {
 
 GameStats game_stats;
 
-Brick game_grid[GAME_GRID_LENGTH] =
-    "00000000"
-    "00000000"
-    "00000000"
-    "00000000"
-    "00000000"
-    "00000000"
-    "00000000"
-    "00000000"
-    "00000000"
-    "00000000"
-    "00000000"
-    "00000000"
-    "00000000"
-    "00000000"
-    "00000000"
-    "00000000"
-    "00000000"
-    "00000000"
-    "00000000"
-    "00000000";
+Brick game_grid[GAME_GRID_LENGTH];
 
 Piece controlled_piece = {.x=2, .y=-3, .type = 'S', .grid = PIECE_S};
+
+// position of the tetris playing area in pixels
+int game_viewport_x;
+int game_viewport_y;
+
+int text_anchor_x;
+int text_anchor_y;
 
 void set_piece_shape(Piece *piece, const Brick *shape){
     strcpy(piece->grid, shape);
@@ -111,6 +98,12 @@ void randomize_piece_shape(Piece* p) {
     p->type = "IOTSZJL"[index];
     set_piece_shape(p, piece_shapes[index]);
     set_piece_shape(p, PIECE_I);
+}
+
+void zero_grid(Brick* grid, int length) {
+  for (int i = 0; i < length; i++) {
+    grid[i] = '0';
+  }
 }
 
 Gamestate gamestate;
@@ -157,8 +150,6 @@ void update_game_stats() {
   game_stats.level = (int)(game_stats.lines_cleared / CLEARS_PER_LEVEL);
   game_stats.drop_interval = DEFAULT_TIME_PER_UPDATE - DROP_INTERVAL_DECREMENT_PER_LEVEL*((float)game_stats.level);
   game_stats.drop_interval = MAX(MINIMUM_DROP_INTERVAL, game_stats.drop_interval);
-  printf("level: %d", game_stats.level);
-  printf("drop_interval: %f", game_stats.drop_interval);
 }
 
 void score_slow_fall(void) {
@@ -203,10 +194,10 @@ bool check_overlap(Piece p, Brick game_grid[GAME_GRID_LENGTH]) {
       if (p.grid[j*PIECE_GRID_SIZE + i] == '0') continue;
       int xprime = i+p.x;
       int yprime = j+p.y;
-      if (yprime < 0) continue;
       if (xprime < 0) return true;
       if (xprime >= GAME_GRID_WIDTH) return true;
       if (yprime >= GAME_GRID_HEIGHT) return true;
+      if (yprime < 0) continue;
       if (game_grid[(yprime)*GAME_GRID_WIDTH + (xprime)] != '0') return true;
       
     }
@@ -243,7 +234,6 @@ void delete_row(int row, Brick game_grid[GAME_GRID_LENGTH]) {
 }
 
 void move_rows_down(int row, Brick game_grid[GAME_GRID_LENGTH]) {
-  printf("deleted row: %d", row);
   Brick copy [GAME_GRID_LENGTH];
   strcpy(copy, game_grid);
   for (int i = 0; i < GAME_GRID_WIDTH; i ++) {
@@ -264,7 +254,6 @@ int clear_lines(Brick game_grid[GAME_GRID_LENGTH]) {
       if (i == GAME_GRID_WIDTH-1) {
         delete_row(row, game_grid);
         move_rows_down(row, game_grid); // move rows above down
-        printf("clearing lines\n");
         lines_cleared++;
         row = 0; i = 0; // restart
       } // delete row if the last tile is a brick
@@ -286,7 +275,6 @@ bool add_piece_to_gamegrid(Piece p, Brick game_grid[GAME_GRID_LENGTH]) {
     }
   }
   int lines_cleared = clear_lines(game_grid);
-  printf("cleared %d lines", lines_cleared);
   score_line_clear(lines_cleared);
   return false;
 }
@@ -312,14 +300,18 @@ void smash(Piece *p, Brick game_grid[GAME_GRID_LENGTH]){
 // DRAW
 // ============================================================
 
-void draw_brick (const int x, const int y, const Brick id, bool ghost) {
+void draw_brick (const int x_in, const int y_in, const Brick id, bool ghost) {
   int padding = 2; // pixels
+  int x = x_in * BRICK_SIZE_PIXELS + game_viewport_x + padding;
+  int y = y_in * BRICK_SIZE_PIXELS + game_viewport_y + padding;
+  int width = BRICK_SIZE_PIXELS - padding;
+  int height = BRICK_SIZE_PIXELS - padding;
   if (ghost) {
     if (id == '0') return;
-    DrawRectangle(x * BRICK_SIZE_PIXELS + padding, y * BRICK_SIZE_PIXELS + padding, BRICK_SIZE_PIXELS-padding, BRICK_SIZE_PIXELS - padding, (Color){255,255,255,100});
+    DrawRectangle(x, y, width,height, (Color){255,255,255,100});
     return;
   }
-  DrawRectangle(x * BRICK_SIZE_PIXELS + padding, y * BRICK_SIZE_PIXELS + padding, BRICK_SIZE_PIXELS-padding, BRICK_SIZE_PIXELS - padding, color_from_id(id));
+  DrawRectangle(x, y, width,height, color_from_id(id));
 }
 
 void draw_grid(const Brick* const grid, const size_t width, const size_t height, const int x, const int y, bool ghost) {
@@ -341,14 +333,18 @@ void draw_game_grid(const Brick game_grid[GAME_GRID_LENGTH]) {
 void draw_drop_line(const Piece p) {
   int x_grid = p.x+(int)(PIECE_GRID_SIZE/2);
   int y_grid = p.y+(int)(PIECE_GRID_SIZE/2);
-  DrawLine(x_grid*BRICK_SIZE_PIXELS, y_grid*BRICK_SIZE_PIXELS, x_grid*BRICK_SIZE_PIXELS, GAME_GRID_HEIGHT*BRICK_SIZE_PIXELS, WHITE);
+  int x1 = x_grid*BRICK_SIZE_PIXELS + game_viewport_x;
+  int y1 = y_grid*BRICK_SIZE_PIXELS + game_viewport_y;
+  int x2 = x1;
+  int y2 = GAME_GRID_HEIGHT*BRICK_SIZE_PIXELS + game_viewport_y;
+  DrawLine(x1,y1,x2,y2, WHITE);
 }
 
 void draw_borders() {
   DrawRectangleLinesEx(
       (Rectangle){
-          0,
-          0,
+          (float)game_viewport_x,
+          (float)game_viewport_y,
           GAME_GRID_WIDTH * BRICK_SIZE_PIXELS,
           GAME_GRID_HEIGHT * BRICK_SIZE_PIXELS
       },
@@ -383,12 +379,21 @@ int main(void)
     const int screenWidth = SCREEN_WIDTH;
     const int screenHeight = SCREEN_HEIGHT;
 
+    zero_grid(game_grid, GAME_GRID_LENGTH);
+
     double time_since_update = 0;
     gamestate = GAME_PLAYING;
     game_stats.score = 0;
     game_stats.level = 0;
     game_stats.lines_cleared = 0;
     game_stats.drop_interval = DEFAULT_TIME_PER_UPDATE;
+
+
+    game_viewport_x = 100;
+    game_viewport_y = 0;
+
+    text_anchor_x = game_viewport_x + GAME_GRID_WIDTH * BRICK_SIZE_PIXELS;
+    text_anchor_y = game_viewport_y;
 
     randomize_piece_shape(&controlled_piece);
 
@@ -441,9 +446,10 @@ int main(void)
         ClearBackground(BLACK);
 
         // Text
-        if (gamestate == GAME_LOST) DrawText("YOU LOST", 50, 350, 30, DARKGRAY);
-        DrawText("Press ESC to exit", 50, 390, 20, GRAY);
-        DrawText(TextFormat("Score: %d", game_stats.score), 50, 50, 30, WHITE);
+        if (gamestate == GAME_LOST) DrawText("YOU LOST", text_anchor_x + 50, text_anchor_y + 350, 30, RED);
+        DrawText("Press ESC to exit", text_anchor_x + 50, text_anchor_y + 10, 20, GRAY);
+        DrawText(TextFormat("Score: %d", game_stats.score), text_anchor_x + 50, text_anchor_y + 50, 30, YELLOW);
+        DrawText(TextFormat("LEVEL: %d", game_stats.level), text_anchor_x + 50, text_anchor_y + 80, 30, YELLOW);
 
         EndDrawing();
     }
