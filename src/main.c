@@ -483,6 +483,26 @@ void draw() {
              text_anchor_y + 80,
              30,
              YELLOW);
+    DrawText("left/right = move",
+             text_anchor_x + 50,
+             text_anchor_y + 110,
+             30,
+             GRAY);
+    DrawText("down = smash",
+             text_anchor_x + 50,
+             text_anchor_y + 140,
+             30,
+             GRAY);
+    DrawText("c = hold",
+             text_anchor_x + 50,
+             text_anchor_y + 170,
+             30,
+             GRAY);
+    DrawText("r = reset",
+             text_anchor_x + 50,
+             text_anchor_y + 200,
+             30,
+             GRAY);
 
     // next piece
     draw_next_piece();
