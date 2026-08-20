@@ -7,7 +7,6 @@
 
 /*
  * TODO:
- * bug when switching held piece while moving into wall/at wall. *
  * add music
  * add soundfx
  * add animation *
@@ -35,6 +34,8 @@
 #define SCORE_2_LINE 200
 #define SCORE_3_LINE 400
 #define SCORE_4_LINE 800
+
+#define AMOUNT_OF_SWITCHES_PER_DROP 1
 
 #define PIECE_GRID_SIZE 4
 
@@ -104,6 +105,8 @@ int next_piece_anchor_x;
 int next_piece_anchor_y;
 
 double time_since_update;
+
+int switch_count = 0;
 
 void set_piece_shape(Piece *piece, const Brick *shape) {
   strcpy(piece->grid, shape);
@@ -356,14 +359,19 @@ bool add_piece_to_gamegrid(Piece p, Brick game_grid[GAME_GRID_LENGTH]) {
   return false;
 }
 
+void reset_piece_position(Piece *p) {
+  p->x = 2;
+  p->y = -3;
+}
+
 // true if lost, false if nothing
 bool move_to_next_piece(Piece *controlled_piece,
                         Brick game_grid[GAME_GRID_LENGTH]) {
   if (add_piece_to_gamegrid(*controlled_piece, game_grid))
     return true;
-  controlled_piece->x = 2;
-  controlled_piece->y = -3;
+  reset_piece_position(controlled_piece);
   randomize_shape(controlled_piece->grid);
+  switch_count = 0;
   return false;
 }
 
@@ -377,10 +385,14 @@ void smash(Piece *p, Brick game_grid[GAME_GRID_LENGTH]) {
 }
 
 void switch_controlled_piece() {
+  if (switch_count >= AMOUNT_OF_SWITCHES_PER_DROP)
+    return;
+  switch_count++;
   Brick buffer[PIECE_GRID_LENGTH];
   strcpy(buffer, controlled_piece.grid);
   strcpy(controlled_piece.grid, next_piece_grid);
   strcpy(next_piece_grid, buffer);
+  reset_piece_position(&controlled_piece);
 }
 
 // ============================================================
