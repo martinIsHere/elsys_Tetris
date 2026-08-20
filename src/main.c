@@ -596,6 +596,30 @@ void shader_init_function(void) {
                  SHADER_UNIFORM_VEC2);
 }
 
+void handle_input(void) {
+  if (IsKeyPressed(KEY_UP)) {
+    rotate_piece(&controlled_piece, game_grid);
+  }
+  if (IsKeyPressed(KEY_DOWN)) {
+    smash(&controlled_piece, game_grid);
+  }
+
+  if (IsKeyPressed(KEY_LEFT)) {
+    controlled_piece.x--;
+    if (check_overlap(controlled_piece, game_grid)) controlled_piece.x++;
+  }
+  if (IsKeyPressed(KEY_RIGHT)) {
+    controlled_piece.x++;
+    if (check_overlap(controlled_piece, game_grid)) controlled_piece.x--;
+  }
+  if (IsKeyPressed(KEY_C)) {
+    switch_controlled_piece();
+  }
+  if (IsKeyPressed(KEY_R)) {
+    reset();
+  }
+}
+
 int main(void) {
   srand(time(NULL));  // seed time for RNG
 
@@ -615,27 +639,7 @@ int main(void) {
         update();
       }
 
-      if (IsKeyPressed(KEY_UP)) {
-        rotate_piece(&controlled_piece, game_grid);
-      }
-      if (IsKeyPressed(KEY_DOWN)) {
-        smash(&controlled_piece, game_grid);
-      }
-
-      if (IsKeyPressed(KEY_LEFT)) {
-        controlled_piece.x--;
-        if (check_overlap(controlled_piece, game_grid)) controlled_piece.x++;
-      }
-      if (IsKeyPressed(KEY_RIGHT)) {
-        controlled_piece.x++;
-        if (check_overlap(controlled_piece, game_grid)) controlled_piece.x--;
-      }
-      if (IsKeyPressed(KEY_C)) {
-        switch_controlled_piece();
-      }
-      if (IsKeyPressed(KEY_R)) {
-        reset();
-      }
+      handle_input();
     }
 
     // Draw
