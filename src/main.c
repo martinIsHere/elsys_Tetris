@@ -24,6 +24,7 @@
 
 #define FPS 60
 #define DEFAULT_TIME_PER_UPDATE 0.5             // seconds
+#define DEFAULT_TIME_PER_ANIMATION_UPDATE 0.5   // seconds
 #define DROP_INTERVAL_DECREMENT_PER_LEVEL 0.05  // seconds
 #define MINIMUM_DROP_INTERVAL 0.1               // seconds
 #define CLEARS_PER_LEVEL 5
@@ -90,6 +91,7 @@ typedef struct GameStats {
 GameStats game_stats;
 
 Brick game_grid[GAME_GRID_LENGTH];
+Brick game_removal_grid[GAME_GRID_LENGTH];
 
 Piece controlled_piece;
 Brick next_piece_grid[PIECE_GRID_LENGTH];
@@ -105,6 +107,7 @@ int next_piece_anchor_x;
 int next_piece_anchor_y;
 
 double time_since_update;
+double time_since_animation_update;
 
 int switch_count = 0;
 
@@ -292,9 +295,10 @@ bool check_next_frame(Piece p, Brick game_grid[GAME_GRID_LENGTH]) {
   return check_overlap(p, game_grid);
 }
 
-void delete_row(int row, Brick game_grid[GAME_GRID_LENGTH]) {
+void mark_row_for_deletion(int row, Brick game_grid[GAME_GRID_LENGTH]) {
   for (int i = 0; i < GAME_GRID_WIDTH; i++) {
-    game_grid[row * GAME_GRID_WIDTH + i] = '0';
+    game_removal_grid[row * GAME_GRID_WIDTH + i] =
+        'X';  // indicates that the corrosponding brick is to be removed
   }
 }
 
@@ -318,8 +322,8 @@ int clear_lines(Brick game_grid[GAME_GRID_LENGTH]) {
       if (game_grid[row * GAME_GRID_WIDTH + i] == '0')
         break;  // break if not a brick
       if (i == GAME_GRID_WIDTH - 1) {
-        delete_row(row, game_grid);
-        move_rows_down(row, game_grid);  // move rows above down
+        mark_row_for_deletion(row, game_grid);
+        // move_rows_down(row, game_grid);  // move rows above down
         lines_cleared++;
         row = 0;
         i = 0;  // restart
@@ -464,6 +468,28 @@ void draw_next_piece() {
 }
 
 // ============================================================
+// animation
+// ============================================================
+
+void game_animation_line_clear1_update(Brick game_grid[GAME_GRID_LENGTH],
+                                       Brick remove_grid[GAME_GRID_LENGTH]) {
+  int blocks_removed = 0;
+  for (int col = 0; col < GAME_GRID_HEIGHT; col++) {
+    for (int j = 0; j < GAME_GRID_WIDTH; j++) {
+      // stuff
+      if (remove_grid[j * GAME_GRID_WIDTH + col] == 'X') {
+        game_grid[j * GAME_GRID_WIDTH + col] = '0';
+        blocks_removed++;
+      }
+    }
+  }
+  if (blocks_removed == 0) {
+    zero_grid(game_removal_grid, GAME_GRID_LENGTH);
+    gamestate = GAME_PLAYING;
+  }
+}
+
+// ============================================================
 // update & main
 // ============================================================
 
@@ -560,6 +586,7 @@ void reset(void) {
 
 void init_globals(void) {
   zero_grid(game_grid, GAME_GRID_LENGTH);
+  zero_grid(game_removal_grid, GAME_GRID_LENGTH);
 
   controlled_piece.x = 2;
   controlled_piece.y = -3;
@@ -631,15 +658,35 @@ int main(void) {
   shader_init_function();
 
   while (!WindowShouldClose()) {
-    if (gamestate == GAME_PLAYING) {
-      time_since_update += GetFrameTime();
+    switch (gamestate) {
+      case GAME_PLAYING: {
+        time_since_update += GetFrameTime();
 
-      if (time_since_update >= game_stats.drop_interval) {
-        time_since_update -= game_stats.drop_interval;
-        update();
+        if (time_since_update >= game_stats.drop_interval) {
+          time_since_update -= game_stats.drop_interval;
+          update();
+        }
+
+        handle_input();
+        break;
       }
+      // animations use a different timer
+      case GAME_ANIMATION_LINE_CLEAR1: {
+        // should remove blocks to be cleared.
+        // Blocks to be removed should have ID 'X'
+        // Two copies of game_grid. One drawn, and one
+        // indicating bricks to be removed
+        time_since_animation_update += GetFrameTime();
 
-      handle_input();
+        if (time_since_animation_update >= DEFAULT_TIME_PER_ANIMATION_UPDATE) {
+          time_since_animation_update -= DEFAULT_TIME_PER_ANIMATION_UPDATE;
+          game_animation_line_clear1_update(game_grid, game_removal_grid);
+        }
+        break;
+      }
+      case GAME_ANIMATION_SMASH: {
+        break;
+      }
     }
 
     // Draw
