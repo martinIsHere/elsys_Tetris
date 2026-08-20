@@ -610,8 +610,7 @@ int main(void) {
     if (gamestate == GAME_PLAYING) {
       time_since_update += GetFrameTime();
 
-      if (time_since_update >= game_stats.drop_interval &&
-          gamestate == GAME_PLAYING) {
+      if (time_since_update >= game_stats.drop_interval) {
         time_since_update -= game_stats.drop_interval;
         update();
       }
