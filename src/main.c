@@ -6,13 +6,13 @@
 #include "string.h"
 
 /*
-* TODO:
-* bug when switching held piece while moving into wall/at wall. *
-* add music
-* add soundfx
-* add animation *
-*
-*/
+ * TODO:
+ * bug when switching held piece while moving into wall/at wall. *
+ * add music
+ * add soundfx
+ * add animation *
+ *
+ */
 
 #define SCREEN_WIDTH 1100
 #define SCREEN_HEIGHT 900
@@ -24,9 +24,9 @@
 #define ENABLE_PREDICTION true
 
 #define FPS 60
-#define DEFAULT_TIME_PER_UPDATE 0.5             // seconds
-#define DROP_INTERVAL_DECREMENT_PER_LEVEL 0.05  // seconds
-#define MINIMUM_DROP_INTERVAL 0.1               // seconds
+#define DEFAULT_TIME_PER_UPDATE 0.5            // seconds
+#define DROP_INTERVAL_DECREMENT_PER_LEVEL 0.05 // seconds
+#define MINIMUM_DROP_INTERVAL 0.1              // seconds
 #define CLEARS_PER_LEVEL 5
 
 #define SCORE_SLOW_FALL 1
@@ -46,7 +46,7 @@
 
 enum {
   PIECE_GRID_LENGTH =
-      PIECE_GRID_SIZE * PIECE_GRID_SIZE + 1,  // +1 for nullterminator
+      PIECE_GRID_SIZE * PIECE_GRID_SIZE + 1, // +1 for nullterminator
   GAME_GRID_LENGTH = GAME_GRID_WIDTH * GAME_GRID_HEIGHT + 1,
   BRICK_SIZE_PIXELS = MIN((int)(SCREEN_WIDTH / GAME_GRID_WIDTH),
                           (int)(SCREEN_HEIGHT / GAME_GRID_HEIGHT)),
@@ -71,7 +71,7 @@ typedef char Brick;
 #define PIECE_T "00000T00TTT00000"
 #define PIECE_NULL "0000000000000000"
 
-const Brick* piece_shapes[] = {PIECE_I, PIECE_O, PIECE_T, PIECE_S,
+const Brick *piece_shapes[] = {PIECE_I, PIECE_O, PIECE_T, PIECE_S,
                                PIECE_Z, PIECE_J, PIECE_L};
 
 typedef struct Piece {
@@ -105,18 +105,18 @@ int next_piece_anchor_y;
 
 double time_since_update;
 
-void set_piece_shape(Piece* piece, const Brick* shape) {
+void set_piece_shape(Piece *piece, const Brick *shape) {
   strcpy(piece->grid, shape);
 }
 
-void randomize_shape(Brick* grid) {
+void randomize_shape(Brick *grid) {
   int index = rand() % 7;
 
   strcpy(grid, piece_shapes[index]);
 }
 
-void zero_grid(Brick* grid, int length) {
-  for (int i = 0; i < length - 1; i++) {  // -1 to not destroy \0
+void zero_grid(Brick *grid, int length) {
+  for (int i = 0; i < length - 1; i++) { // -1 to not destroy \0
     grid[i] = '0';
   }
 }
@@ -127,30 +127,30 @@ Color color_from_id(Brick id) {
   Color color = MAGENTA;
 
   switch (id) {
-    case '0':
-      color = (Color){0, 0, 0, 0};
-      break;
-    case 'I':
-      color = SKYBLUE;
-      break;
-    case 'O':
-      color = YELLOW;
-      break;
-    case 'T':
-      color = PURPLE;
-      break;
-    case 'S':
-      color = GREEN;
-      break;
-    case 'Z':
-      color = RED;
-      break;
-    case 'J':
-      color = BLUE;
-      break;
-    case 'L':
-      color = ORANGE;
-      break;
+  case '0':
+    color = (Color){0, 0, 0, 0};
+    break;
+  case 'I':
+    color = SKYBLUE;
+    break;
+  case 'O':
+    color = YELLOW;
+    break;
+  case 'T':
+    color = PURPLE;
+    break;
+  case 'S':
+    color = GREEN;
+    break;
+  case 'Z':
+    color = RED;
+    break;
+  case 'J':
+    color = BLUE;
+    break;
+  case 'L':
+    color = ORANGE;
+    break;
   }
 
   return color;
@@ -163,7 +163,7 @@ Color color_from_id(Brick id) {
 Shader glow_shader;
 RenderTexture2D game_target;
 
-const char* glow_shader_code =
+const char *glow_shader_code =
     "#version 330\n"
 
     "in vec2 fragTexCoord;\n"
@@ -226,22 +226,22 @@ void score_line_clear(const int lines_cleared) {
   update_game_stats();
 
   switch (lines_cleared) {
-    case 0:
-      break;
-    case 1:
-      game_stats.score += SCORE_1_LINE;
-      break;
-    case 2:
-      game_stats.score += SCORE_2_LINE;
-      break;
-    case 3:
-      game_stats.score += SCORE_3_LINE;
-      break;
-    case 4:
-      game_stats.score += SCORE_4_LINE;
-      break;
-    default:
-      break;
+  case 0:
+    break;
+  case 1:
+    game_stats.score += SCORE_1_LINE;
+    break;
+  case 2:
+    game_stats.score += SCORE_2_LINE;
+    break;
+  case 3:
+    game_stats.score += SCORE_3_LINE;
+    break;
+  case 4:
+    game_stats.score += SCORE_4_LINE;
+    break;
+  default:
+    break;
   }
 }
 
@@ -252,22 +252,28 @@ void score_line_clear(const int lines_cleared) {
 bool check_overlap(Piece p, Brick game_grid[GAME_GRID_LENGTH]) {
   for (int j = 0; j < PIECE_GRID_SIZE; j++) {
     for (int i = 0; i < PIECE_GRID_SIZE; i++) {
-      if (p.grid[j * PIECE_GRID_SIZE + i] == '0') continue;
+      if (p.grid[j * PIECE_GRID_SIZE + i] == '0')
+        continue;
       int xprime = i + p.x;
       int yprime = j + p.y;
-      if (xprime < 0) return true;
-      if (xprime >= GAME_GRID_WIDTH) return true;
-      if (yprime >= GAME_GRID_HEIGHT) return true;
-      if (yprime < 0) continue;
-      if (game_grid[(yprime)*GAME_GRID_WIDTH + (xprime)] != '0') return true;
+      if (xprime < 0)
+        return true;
+      if (xprime >= GAME_GRID_WIDTH)
+        return true;
+      if (yprime >= GAME_GRID_HEIGHT)
+        return true;
+      if (yprime < 0)
+        continue;
+      if (game_grid[(yprime)*GAME_GRID_WIDTH + (xprime)] != '0')
+        return true;
     }
   }
   return false;
 }
 
-void rotate_piece(Piece* p, Brick game_grid[GAME_GRID_LENGTH]) {
-  float rotcen_x = 1.5f;  // rotation center
-  float rotcen_y = 1.5f;  // rotation center
+void rotate_piece(Piece *p, Brick game_grid[GAME_GRID_LENGTH]) {
+  float rotcen_x = 1.5f; // rotation center
+  float rotcen_y = 1.5f; // rotation center
   Piece rotated_piece = {.x = p->x, .y = p->y};
   for (int j = 0; j < PIECE_GRID_SIZE; j++) {
     for (int i = 0; i < PIECE_GRID_SIZE; i++) {
@@ -278,7 +284,8 @@ void rotate_piece(Piece* p, Brick game_grid[GAME_GRID_LENGTH]) {
           p->grid[j * PIECE_GRID_SIZE + i];
     }
   }
-  if (check_overlap(rotated_piece, game_grid)) return;
+  if (check_overlap(rotated_piece, game_grid))
+    return;
   strcpy(p->grid, rotated_piece.grid);
 }
 
@@ -313,14 +320,14 @@ int clear_lines(Brick game_grid[GAME_GRID_LENGTH]) {
   for (int row = 0; row < GAME_GRID_HEIGHT; row++) {
     for (int i = 0; i < GAME_GRID_WIDTH; i++) {
       if (game_grid[row * GAME_GRID_WIDTH + i] == '0')
-        break;  // break if not a brick
+        break; // break if not a brick
       if (i == GAME_GRID_WIDTH - 1) {
         delete_row(row, game_grid);
-        move_rows_down(row, game_grid);  // move rows above down
+        move_rows_down(row, game_grid); // move rows above down
         lines_cleared++;
         row = 0;
-        i = 0;  // restart
-      }  // delete row if the last tile is a brick
+        i = 0; // restart
+      } // delete row if the last tile is a brick
     }
   }
   return lines_cleared;
@@ -330,11 +337,16 @@ int clear_lines(Brick game_grid[GAME_GRID_LENGTH]) {
 bool add_piece_to_gamegrid(Piece p, Brick game_grid[GAME_GRID_LENGTH]) {
   for (int j = 0; j < PIECE_GRID_SIZE; j++) {
     for (int i = 0; i < PIECE_GRID_SIZE; i++) {
-      if (p.grid[j * PIECE_GRID_SIZE + i] == '0') continue;
-      if (j + p.y < 0) return true;
-      if (i + p.x < 0) continue;
-      if (i + p.x >= GAME_GRID_WIDTH) continue;
-      if (j + p.y >= GAME_GRID_HEIGHT) continue;
+      if (p.grid[j * PIECE_GRID_SIZE + i] == '0')
+        continue;
+      if (j + p.y < 0)
+        return true;
+      if (i + p.x < 0)
+        continue;
+      if (i + p.x >= GAME_GRID_WIDTH)
+        continue;
+      if (j + p.y >= GAME_GRID_HEIGHT)
+        continue;
       game_grid[(j + p.y) * GAME_GRID_WIDTH + (i + p.x)] =
           p.grid[j * PIECE_GRID_SIZE + i];
     }
@@ -345,21 +357,23 @@ bool add_piece_to_gamegrid(Piece p, Brick game_grid[GAME_GRID_LENGTH]) {
 }
 
 // true if lost, false if nothing
-bool move_to_next_piece(Piece* controlled_piece,
+bool move_to_next_piece(Piece *controlled_piece,
                         Brick game_grid[GAME_GRID_LENGTH]) {
-  if (add_piece_to_gamegrid(*controlled_piece, game_grid)) return true;
+  if (add_piece_to_gamegrid(*controlled_piece, game_grid))
+    return true;
   controlled_piece->x = 2;
   controlled_piece->y = -3;
   randomize_shape(controlled_piece->grid);
   return false;
 }
 
-void smash(Piece* p, Brick game_grid[GAME_GRID_LENGTH]) {
+void smash(Piece *p, Brick game_grid[GAME_GRID_LENGTH]) {
   while (!check_next_frame(*p, game_grid)) {
     p->y++;
     score_fast_fall();
   }
-  if (move_to_next_piece(p, game_grid)) gamestate = GAME_LOST;
+  if (move_to_next_piece(p, game_grid))
+    gamestate = GAME_LOST;
 }
 
 void switch_controlled_piece() {
@@ -375,13 +389,14 @@ void switch_controlled_piece() {
 
 void draw_brick_on_grid(const int x_in, const int y_in, const Brick id,
                         bool ghost) {
-  int padding = 2;  // pixels
+  int padding = 2; // pixels
   int x = x_in * BRICK_SIZE_PIXELS + game_viewport_x + padding;
   int y = y_in * BRICK_SIZE_PIXELS + game_viewport_y + padding;
   int width = BRICK_SIZE_PIXELS - padding;
   int height = BRICK_SIZE_PIXELS - padding;
   if (ghost) {
-    if (id == '0') return;
+    if (id == '0')
+      return;
     DrawRectangle(x, y, width, height, (Color){255, 255, 255, 100});
     return;
   }
@@ -393,7 +408,7 @@ void draw_brick(const int x, const int y, const int width, const int height,
   DrawRectangle(x, y, width, height, color_from_id(id));
 }
 
-void draw_grid_on_grid(const Brick* const grid, const size_t width,
+void draw_grid_on_grid(const Brick *const grid, const size_t width,
                        const size_t height, const int x, const int y,
                        bool ghost) {
   for (int j = 0; j < height; j++) {
@@ -403,7 +418,7 @@ void draw_grid_on_grid(const Brick* const grid, const size_t width,
   }
 }
 
-void draw_grid(const Brick* const grid, const size_t width, const size_t height,
+void draw_grid(const Brick *const grid, const size_t width, const size_t height,
                const size_t size_pixels, const int x, const int y) {
   for (int j = 0; j < height; j++) {
     for (int i = 0; i < width; i++) {
@@ -432,11 +447,11 @@ void draw_drop_line(const Piece p) {
 }
 
 void draw_borders() {
-  DrawRectangleLinesEx(
-      (Rectangle){(float)game_viewport_x, (float)game_viewport_y,
-                  GAME_GRID_WIDTH * BRICK_SIZE_PIXELS,
-                  GAME_GRID_HEIGHT * BRICK_SIZE_PIXELS},
-      4, WHITE);
+  DrawRectangleLinesEx((Rectangle){(float)game_viewport_x,
+                                   (float)game_viewport_y,
+                                   GAME_GRID_WIDTH * BRICK_SIZE_PIXELS,
+                                   GAME_GRID_HEIGHT * BRICK_SIZE_PIXELS},
+                       4, WHITE);
 }
 
 void draw_prediction_piece(Piece p) {
@@ -458,7 +473,8 @@ void draw_next_piece() {
 
 void update() {
   if (check_next_frame(controlled_piece, game_grid)) {
-    if (move_to_next_piece(&controlled_piece, game_grid)) gamestate = GAME_LOST;
+    if (move_to_next_piece(&controlled_piece, game_grid))
+      gamestate = GAME_LOST;
   } else
     controlled_piece.y++;
   score_slow_fall();
@@ -474,9 +490,11 @@ void draw() {
 
   draw_borders();
 
-  if (ENABLE_FALL_LINE) draw_drop_line(controlled_piece);
+  if (ENABLE_FALL_LINE)
+    draw_drop_line(controlled_piece);
 
-  if (ENABLE_PREDICTION) draw_prediction_piece(controlled_piece);
+  if (ENABLE_PREDICTION)
+    draw_prediction_piece(controlled_piece);
 
   draw_piece_on_grid(controlled_piece, false);
 
@@ -548,7 +566,7 @@ void reset(void) {
 }
 
 int main(void) {
-  srand(time(NULL));  // seed time for RNG
+  srand(time(NULL)); // seed time for RNG
   const int screenWidth = SCREEN_WIDTH;
   const int screenHeight = SCREEN_HEIGHT;
 
@@ -608,11 +626,13 @@ int main(void) {
 
       if (IsKeyPressed(KEY_LEFT)) {
         controlled_piece.x--;
-        if (check_overlap(controlled_piece, game_grid)) controlled_piece.x++;
+        if (check_overlap(controlled_piece, game_grid))
+          controlled_piece.x++;
       }
       if (IsKeyPressed(KEY_RIGHT)) {
         controlled_piece.x++;
-        if (check_overlap(controlled_piece, game_grid)) controlled_piece.x--;
+        if (check_overlap(controlled_piece, game_grid))
+          controlled_piece.x--;
       }
       if (IsKeyPressed(KEY_C)) {
         switch_controlled_piece();
