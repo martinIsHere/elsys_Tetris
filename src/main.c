@@ -584,16 +584,7 @@ void init_globals(void) {
   randomize_shape(next_piece_grid);
 }
 
-void shader_init_function(void) {}
-
-int main(void) {
-  srand(time(NULL));  // seed time for RNG
-
-  init_globals();
-
-  InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "Elsys Tetris");
-  SetTargetFPS(FPS);
-
+void shader_init_function(void) {
   game_target = LoadRenderTexture(SCREEN_WIDTH, SCREEN_HEIGHT);
   glow_shader = LoadShaderFromMemory(NULL, glow_shader_code);
 
@@ -603,6 +594,17 @@ int main(void) {
 
   SetShaderValue(glow_shader, resolution_location, &resolution,
                  SHADER_UNIFORM_VEC2);
+}
+
+int main(void) {
+  srand(time(NULL));  // seed time for RNG
+
+  init_globals();
+
+  InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "Elsys Tetris");
+  SetTargetFPS(FPS);
+
+  shader_init_function();
 
   while (!WindowShouldClose()) {
     if (gamestate == GAME_PLAYING) {
