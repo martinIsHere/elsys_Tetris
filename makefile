@@ -15,34 +15,32 @@ OBJ := $(SRC:$(SRC_DIR)/%.c=$(BUILD_DIR)/%.o)
 UNAME_S := $(shell uname -s)
 
 # Platform-specific configuration
-ifeq ($(findstring MINGW,$(UNAME_S)),MINGW)
+ifeq ($(UNAME_S),Windows_NT)
 
     PLATFORM := windows
     RAYLIB_DIR := lib/windows
+    INCLUDE_DIR := include/windows
 
-    CFLAGS := -I$(RAYLIB_DIR)
+    CFLAGS := -I$(INCLUDE_DIR)
     LDFLAGS := -L$(RAYLIB_DIR) -lraylib -lgdi32 -lwinmm -mwindows
 
 else ifeq ($(UNAME_S),Linux)
 
     PLATFORM := linux
     RAYLIB_DIR := lib/linux
+    INCLUDE_DIR := include/linux
 
-    CFLAGS := -I$(RAYLIB_DIR)
+    CFLAGS := -I$(INCLUDE_DIR)
     LDFLAGS := -L$(RAYLIB_DIR) -Wl,-Bstatic -lraylib -Wl,-Bdynamic -lm -lpthread -ldl -lrt -lX11
-
-else
-
-    $(error Unsupported OS: $(UNAME_S))
 
 endif
 
 # Default target
 .PHONY: all
-all: $(BIN_DIR)/$(TARGET)
+all: $(BIN_DIR)/$(TARGET)$(EXE)
 
 # Link
-$(BIN_DIR)/$(TARGET): $(OBJ)
+$(BIN_DIR)/$(TARGET)$(EXE): $(OBJ)
 	@mkdir -p $(BIN_DIR)
 	@echo "Linking $@ ($(PLATFORM))..."
 	$(CC) $(OBJ) -o $@ $(LDFLAGS)
