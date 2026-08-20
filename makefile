@@ -22,7 +22,8 @@ ifeq ($(UNAME_S),Windows_NT)
     INCLUDE_DIR := include/windows
 
     CFLAGS := -I$(INCLUDE_DIR)
-    LDFLAGS := -L$(RAYLIB_DIR) -lraylib -lgdi32 -lwinmm -mwindows
+    LDFLAGS := -L$(RAYLIB_DIR) -lraylib -lgdi32 -lwinmm
+    # LDFLAGS := -L$(RAYLIB_DIR) -lraylib -lgdi32 -lwinmm -mwindows
 
 else ifeq ($(UNAME_S),Linux)
 

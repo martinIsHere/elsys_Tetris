@@ -24,7 +24,7 @@
 
 #define FPS 60
 #define DEFAULT_TIME_PER_UPDATE 0.5             // seconds
-#define DEFAULT_TIME_PER_ANIMATION_UPDATE 0.5   // seconds
+#define DEFAULT_TIME_PER_ANIMATION_UPDATE 0.05  // seconds
 #define DROP_INTERVAL_DECREMENT_PER_LEVEL 0.05  // seconds
 #define MINIMUM_DROP_INTERVAL 0.1               // seconds
 #define CLEARS_PER_LEVEL 5
@@ -91,7 +91,7 @@ typedef struct GameStats {
 GameStats game_stats;
 
 Brick game_grid[GAME_GRID_LENGTH];
-Brick game_removal_grid[GAME_GRID_LENGTH];
+Brick game_modification_grid[GAME_GRID_LENGTH];
 
 Piece controlled_piece;
 Brick next_piece_grid[PIECE_GRID_LENGTH];
@@ -295,34 +295,53 @@ bool check_next_frame(Piece p, Brick game_grid[GAME_GRID_LENGTH]) {
   return check_overlap(p, game_grid);
 }
 
-void mark_row_for_deletion(int row, Brick game_grid[GAME_GRID_LENGTH]) {
+void mark_row_for_deletion(int row, Brick game_grid[GAME_GRID_LENGTH],
+                           Brick game_modification_grid[GAME_GRID_LENGTH]) {
   for (int i = 0; i < GAME_GRID_WIDTH; i++) {
-    game_removal_grid[row * GAME_GRID_WIDTH + i] =
+    game_modification_grid[row * GAME_GRID_WIDTH + i] =
         'X';  // indicates that the corrosponding brick is to be removed
   }
 }
 
-void move_rows_down(int row, Brick game_grid[GAME_GRID_LENGTH]) {
+void move_rows_down(Brick game_grid[GAME_GRID_LENGTH],
+                    Brick game_modification_grid[GAME_GRID_LENGTH]) {
+  /*
+   * Assumes removed bricks are rectangular (& connected), covering one
+   * GAME_GRID_WIDTH
+   */
   Brick copy[GAME_GRID_LENGTH];
   strcpy(copy, game_grid);
-  for (int i = 0; i < GAME_GRID_WIDTH; i++) {
-    game_grid[i] = '0';
+  int amount_of_removed_bricks = 0;
+  int index_of_lowest_removed_brick = -1;
+  for (int j = 0; j < GAME_GRID_HEIGHT; j++) {
+    if (game_modification_grid[j * GAME_GRID_WIDTH] != 'X') continue;
+    amount_of_removed_bricks++;
+    index_of_lowest_removed_brick = j;
   }
-  for (int j = 0; j < row; j++) {
+  for (int j = 0;
+       j < index_of_lowest_removed_brick + 1 - amount_of_removed_bricks; j++) {
     for (int i = 0; i < GAME_GRID_WIDTH; i++) {
-      game_grid[(j + 1) * GAME_GRID_WIDTH + i] = copy[j * GAME_GRID_WIDTH + i];
+      copy[(j + amount_of_removed_bricks) * GAME_GRID_WIDTH + i +
+           amount_of_removed_bricks] =
+          game_grid[j * GAME_GRID_WIDTH + i + amount_of_removed_bricks];
     }
   }
+  // apply changes
+  strcpy(game_grid, copy);
 }
 
-int clear_lines(Brick game_grid[GAME_GRID_LENGTH]) {
+int clear_lines(Brick game_grid[GAME_GRID_LENGTH],
+                Brick game_modification_grid[GAME_GRID_LENGTH]) {
   int lines_cleared = 0;
   for (int row = 0; row < GAME_GRID_HEIGHT; row++) {
     for (int i = 0; i < GAME_GRID_WIDTH; i++) {
-      if (game_grid[row * GAME_GRID_WIDTH + i] == '0')
+      // check if space contains a brick, or if a brick has been removed (i.e.
+      // empty)
+      if (game_grid[row * GAME_GRID_WIDTH + i] == '0' ||
+          game_modification_grid[row * GAME_GRID_WIDTH + i] == 'X')
         break;  // break if not a brick
       if (i == GAME_GRID_WIDTH - 1) {
-        mark_row_for_deletion(row, game_grid);
+        mark_row_for_deletion(row, game_grid, game_modification_grid);
         // move_rows_down(row, game_grid);  // move rows above down
         lines_cleared++;
         row = 0;
@@ -330,6 +349,7 @@ int clear_lines(Brick game_grid[GAME_GRID_LENGTH]) {
       }  // delete row if the last tile is a brick
     }
   }
+  // change to animation state
   return lines_cleared;
 }
 
@@ -346,7 +366,8 @@ bool add_piece_to_gamegrid(Piece p, Brick game_grid[GAME_GRID_LENGTH]) {
           p.grid[j * PIECE_GRID_SIZE + i];
     }
   }
-  int lines_cleared = clear_lines(game_grid);
+  int lines_cleared = clear_lines(game_grid, game_modification_grid);
+  if (lines_cleared != 0) gamestate = GAME_ANIMATION_LINE_CLEAR1;
   score_line_clear(lines_cleared);
   return false;
 }
@@ -468,23 +489,26 @@ void draw_next_piece() {
 }
 
 // ============================================================
-// animation
+// ANIMATION
 // ============================================================
 
-void game_animation_line_clear1_update(Brick game_grid[GAME_GRID_LENGTH],
-                                       Brick remove_grid[GAME_GRID_LENGTH]) {
+void game_animation_line_clear1_update(
+    Brick game_grid[GAME_GRID_LENGTH],
+    Brick game_modification_grid[GAME_GRID_LENGTH]) {
   int blocks_removed = 0;
-  for (int col = 0; col < GAME_GRID_HEIGHT; col++) {
-    for (int j = 0; j < GAME_GRID_WIDTH; j++) {
-      // stuff
-      if (remove_grid[j * GAME_GRID_WIDTH + col] == 'X') {
+  for (int col = 0; col < GAME_GRID_WIDTH; col++) {
+    for (int j = 0; j < GAME_GRID_HEIGHT; j++) {
+      if (game_grid[j * GAME_GRID_WIDTH + col] == '0') continue;
+      if (game_modification_grid[j * GAME_GRID_WIDTH + col] == 'X') {
         game_grid[j * GAME_GRID_WIDTH + col] = '0';
         blocks_removed++;
       }
     }
+    if (blocks_removed != 0) break;
   }
   if (blocks_removed == 0) {
-    zero_grid(game_removal_grid, GAME_GRID_LENGTH);
+    move_rows_down(game_grid, game_modification_grid);
+    zero_grid(game_modification_grid, GAME_GRID_LENGTH);
     gamestate = GAME_PLAYING;
   }
 }
@@ -534,6 +558,7 @@ void draw() {
   DrawText("down = smash", text_anchor_x + 50, text_anchor_y + 140, 30, GRAY);
   DrawText("c = hold", text_anchor_x + 50, text_anchor_y + 170, 30, GRAY);
   DrawText("r = reset", text_anchor_x + 50, text_anchor_y + 200, 30, GRAY);
+  DrawText("up = rotate", text_anchor_x + 50, text_anchor_y + 230, 30, GRAY);
 
   // next piece
   draw_next_piece();
@@ -586,7 +611,7 @@ void reset(void) {
 
 void init_globals(void) {
   zero_grid(game_grid, GAME_GRID_LENGTH);
-  zero_grid(game_removal_grid, GAME_GRID_LENGTH);
+  zero_grid(game_modification_grid, GAME_GRID_LENGTH);
 
   controlled_piece.x = 2;
   controlled_piece.y = -3;
@@ -680,7 +705,7 @@ int main(void) {
 
         if (time_since_animation_update >= DEFAULT_TIME_PER_ANIMATION_UPDATE) {
           time_since_animation_update -= DEFAULT_TIME_PER_ANIMATION_UPDATE;
-          game_animation_line_clear1_update(game_grid, game_removal_grid);
+          game_animation_line_clear1_update(game_grid, game_modification_grid);
         }
         break;
       }
