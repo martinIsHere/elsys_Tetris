@@ -1,3 +1,4 @@
+#include <math.h>
 #include <stdlib.h>
 #include <time.h>
 
@@ -42,6 +43,9 @@
 
 #define GAME_GRID_WIDTH 10
 #define GAME_GRID_HEIGHT 20
+
+#define DEFAULT_GGVIEWPORT_X 300
+#define DEFAULT_GGVIEWPORT_Y 0
 
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
@@ -108,6 +112,9 @@ int next_piece_anchor_y;
 
 double time_since_update;
 double time_since_animation_update;
+double time_since_animation_start;
+
+int animation_lines_being_cleared;
 
 int switch_count = 0;
 
@@ -129,37 +136,84 @@ void zero_grid(Brick* grid, int length) {
 
 Gamestate gamestate;
 
-Color color_from_id(Brick id) {
+Color color_wt(int r, int g, int b, float intensity) {
+  return (Color){(unsigned char)(r * intensity), (unsigned char)(g * intensity),
+                 (unsigned char)(b * intensity), 255};
+}
+
+Color color_from_id(Brick id, float intensity) {
   Color color = MAGENTA;
 
   switch (id) {
     case '0':
       color = (Color){0, 0, 0, 0};
       break;
-    case 'I':
+    case 'i':
       color = SKYBLUE;
       break;
-    case 'O':
+    case 'o':
       color = YELLOW;
       break;
-    case 'T':
+    case 't':
       color = PURPLE;
       break;
-    case 'S':
+    case 's':
       color = GREEN;
       break;
-    case 'Z':
+    case 'z':
       color = RED;
       break;
-    case 'J':
+    case 'j':
       color = BLUE;
       break;
-    case 'L':
+    case 'l':
       color = ORANGE;
+      break;
+    case 'I':
+      color = color_wt(100, 220, 255, intensity);
+      break;
+    case 'O':
+      color = color_wt(255, 255, 100, intensity);
+      break;
+    case 'T':
+      color = color_wt(220, 100, 255, intensity);
+      break;
+    case 'S':
+      color = color_wt(120, 255, 100, intensity);
+      break;
+    case 'Z':
+      color = color_wt(255, 100, 100, intensity);
+      break;
+    case 'J':
+      color = color_wt(100, 150, 255, intensity);
+      break;
+    case 'L':
+      color = color_wt(255, 180, 70, intensity);
       break;
   }
 
   return color;
+}
+
+// ============================================================
+// MATH
+// ============================================================
+
+// output: pixel offset of game_grid
+// intensity = 1 is default for 1 line
+int game_grid_shake_offset(double time_seconds, double intensity) {
+  // constants
+  double omega = 4000 * intensity + 4000;
+  double phi = 0;
+  double A = 8 * intensity + 5;
+  double c = 0;
+
+  return (int)(A * sin(omega * time_seconds + phi) + c);
+}
+
+double time_per_animation_update(int amount_of_lines) {
+  return DEFAULT_TIME_PER_ANIMATION_UPDATE +
+         amount_of_lines * DEFAULT_TIME_PER_ANIMATION_UPDATE * 0.1;
 }
 
 // ============================================================
@@ -312,18 +366,17 @@ void move_rows_down(Brick game_grid[GAME_GRID_LENGTH],
   Brick copy[GAME_GRID_LENGTH];
   strcpy(copy, game_grid);
   int amount_of_removed_bricks = 0;
-  int index_of_lowest_removed_brick = -1;
+  int y_of_lowest_removed_brick = -1;
   for (int j = 0; j < GAME_GRID_HEIGHT; j++) {
     if (game_modification_grid[j * GAME_GRID_WIDTH] != 'X') continue;
     amount_of_removed_bricks++;
-    index_of_lowest_removed_brick = j;
+    y_of_lowest_removed_brick = j;
   }
-  for (int j = 0;
-       j < index_of_lowest_removed_brick + 1 - amount_of_removed_bricks; j++) {
+  for (int j = 0; j < y_of_lowest_removed_brick + 1 - amount_of_removed_bricks;
+       j++) {
     for (int i = 0; i < GAME_GRID_WIDTH; i++) {
-      copy[(j + amount_of_removed_bricks) * GAME_GRID_WIDTH + i +
-           amount_of_removed_bricks] =
-          game_grid[j * GAME_GRID_WIDTH + i + amount_of_removed_bricks];
+      copy[(j + amount_of_removed_bricks) * GAME_GRID_WIDTH + i] =
+          game_grid[j * GAME_GRID_WIDTH + i];
     }
   }
   // apply changes
@@ -367,7 +420,10 @@ bool add_piece_to_gamegrid(Piece p, Brick game_grid[GAME_GRID_LENGTH]) {
     }
   }
   int lines_cleared = clear_lines(game_grid, game_modification_grid);
-  if (lines_cleared != 0) gamestate = GAME_ANIMATION_LINE_CLEAR1;
+  if (lines_cleared != 0) {
+    gamestate = GAME_ANIMATION_LINE_CLEAR1;
+    animation_lines_being_cleared = lines_cleared;
+  }
   score_line_clear(lines_cleared);
   return false;
 }
@@ -421,12 +477,12 @@ void draw_brick_on_grid(const int x_in, const int y_in, const Brick id,
     DrawRectangle(x, y, width, height, (Color){255, 255, 255, 100});
     return;
   }
-  DrawRectangle(x, y, width, height, color_from_id(id));
+  DrawRectangle(x, y, width, height, color_from_id(id, 1));
 }
 
 void draw_brick(const int x, const int y, const int width, const int height,
                 const Brick id) {
-  DrawRectangle(x, y, width, height, color_from_id(id));
+  DrawRectangle(x, y, width, height, color_from_id(id, 1));
 }
 
 void draw_grid_on_grid(const Brick* const grid, const size_t width,
@@ -494,7 +550,8 @@ void draw_next_piece() {
 
 void game_animation_line_clear1_update(
     Brick game_grid[GAME_GRID_LENGTH],
-    Brick game_modification_grid[GAME_GRID_LENGTH]) {
+    Brick game_modification_grid[GAME_GRID_LENGTH],
+    int amount_of_cleared_lines) {
   int blocks_removed = 0;
   for (int col = 0; col < GAME_GRID_WIDTH; col++) {
     for (int j = 0; j < GAME_GRID_HEIGHT; j++) {
@@ -506,7 +563,15 @@ void game_animation_line_clear1_update(
     }
     if (blocks_removed != 0) break;
   }
+
+  game_viewport_x =
+      DEFAULT_GGVIEWPORT_X +
+      game_grid_shake_offset(time_since_animation_start,
+                             (double)animation_lines_being_cleared);
+
   if (blocks_removed == 0) {
+    game_viewport_x = DEFAULT_GGVIEWPORT_X;
+    time_since_animation_start = 0;
     move_rows_down(game_grid, game_modification_grid);
     zero_grid(game_modification_grid, GAME_GRID_LENGTH);
     gamestate = GAME_PLAYING;
@@ -616,6 +681,9 @@ void init_globals(void) {
   controlled_piece.x = 2;
   controlled_piece.y = -3;
 
+  animation_lines_being_cleared = 0;
+
+  time_since_animation_start = 0;
   time_since_update = 0;
   gamestate = GAME_PLAYING;
   game_stats.score = 0;
@@ -623,8 +691,8 @@ void init_globals(void) {
   game_stats.lines_cleared = 0;
   game_stats.drop_interval = DEFAULT_TIME_PER_UPDATE;
 
-  game_viewport_x = 300;
-  game_viewport_y = 0;
+  game_viewport_x = DEFAULT_GGVIEWPORT_X;
+  game_viewport_y = DEFAULT_GGVIEWPORT_Y;
 
   text_anchor_x = game_viewport_x + GAME_GRID_WIDTH * BRICK_SIZE_PIXELS;
   text_anchor_y = game_viewport_y;
@@ -701,11 +769,16 @@ int main(void) {
         // Blocks to be removed should have ID 'X'
         // Two copies of game_grid. One drawn, and one
         // indicating bricks to be removed
-        time_since_animation_update += GetFrameTime();
+        double frametime = GetFrameTime();
+        time_since_animation_update += frametime;
+        time_since_animation_start += frametime;
 
-        if (time_since_animation_update >= DEFAULT_TIME_PER_ANIMATION_UPDATE) {
-          time_since_animation_update -= DEFAULT_TIME_PER_ANIMATION_UPDATE;
-          game_animation_line_clear1_update(game_grid, game_modification_grid);
+        if (time_since_animation_update >=
+            time_per_animation_update(animation_lines_being_cleared)) {
+          time_since_animation_update -=
+              time_per_animation_update(animation_lines_being_cleared);
+          game_animation_line_clear1_update(game_grid, game_modification_grid,
+                                            animation_lines_being_cleared);
         }
         break;
       }
