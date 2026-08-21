@@ -24,10 +24,10 @@
 #define ENABLE_PREDICTION true
 
 #define FPS 60
-#define DEFAULT_TIME_PER_UPDATE 0.5             // seconds
-#define DEFAULT_TIME_PER_ANIMATION_UPDATE 0.05  // seconds
-#define DROP_INTERVAL_DECREMENT_PER_LEVEL 0.05  // seconds
-#define MINIMUM_DROP_INTERVAL 0.1               // seconds
+#define DEFAULT_TIME_PER_UPDATE 0.5            // seconds
+#define DEFAULT_TIME_PER_ANIMATION_UPDATE 0.05 // seconds
+#define DROP_INTERVAL_DECREMENT_PER_LEVEL 0.05 // seconds
+#define MINIMUM_DROP_INTERVAL 0.1              // seconds
 #define CLEARS_PER_LEVEL 5
 
 #define SCORE_SLOW_FALL 1
@@ -52,7 +52,7 @@
 
 enum {
   PIECE_GRID_LENGTH =
-      PIECE_GRID_SIZE * PIECE_GRID_SIZE + 1,  // +1 for nullterminator
+      PIECE_GRID_SIZE * PIECE_GRID_SIZE + 1, // +1 for nullterminator
   GAME_GRID_LENGTH = GAME_GRID_WIDTH * GAME_GRID_HEIGHT + 1,
   BRICK_SIZE_PIXELS = MIN((int)(SCREEN_WIDTH / GAME_GRID_WIDTH),
                           (int)(SCREEN_HEIGHT / GAME_GRID_HEIGHT)),
@@ -77,7 +77,7 @@ typedef char Brick;
 #define PIECE_T "00000T00TTT00000"
 #define PIECE_NULL "0000000000000000"
 
-const Brick* piece_shapes[] = {PIECE_I, PIECE_O, PIECE_T, PIECE_S,
+const Brick *piece_shapes[] = {PIECE_I, PIECE_O, PIECE_T, PIECE_S,
                                PIECE_Z, PIECE_J, PIECE_L};
 
 typedef struct Piece {
@@ -118,18 +118,36 @@ int animation_lines_being_cleared;
 
 int switch_count = 0;
 
-void set_piece_shape(Piece* piece, const Brick* shape) {
+typedef struct SoundFX {
+  Sound move;
+  Sound rotate;
+  Sound place;
+  Sound line_clear;
+  Sound tetris;
+  Sound game_over;
+} SoundFX;
+
+typedef struct Musica {
+  Sound track1;
+} Musica;
+
+SoundFX soundfx;
+Musica music;
+
+bool has_audio_output;
+
+void set_piece_shape(Piece *piece, const Brick *shape) {
   strcpy(piece->grid, shape);
 }
 
-void randomize_shape(Brick* grid) {
+void randomize_shape(Brick *grid) {
   int index = rand() % 7;
 
   strcpy(grid, piece_shapes[index]);
 }
 
-void zero_grid(Brick* grid, int length) {
-  for (int i = 0; i < length - 1; i++) {  // -1 to not destroy \0
+void zero_grid(Brick *grid, int length) {
+  for (int i = 0; i < length - 1; i++) { // -1 to not destroy \0
     grid[i] = '0';
   }
 }
@@ -145,51 +163,51 @@ Color color_from_id(Brick id, float intensity) {
   Color color = MAGENTA;
 
   switch (id) {
-    case '0':
-      color = (Color){0, 0, 0, 0};
-      break;
-    case 'i':
-      color = SKYBLUE;
-      break;
-    case 'o':
-      color = YELLOW;
-      break;
-    case 't':
-      color = PURPLE;
-      break;
-    case 's':
-      color = GREEN;
-      break;
-    case 'z':
-      color = RED;
-      break;
-    case 'j':
-      color = BLUE;
-      break;
-    case 'l':
-      color = ORANGE;
-      break;
-    case 'I':
-      color = color_wt(100, 220, 255, intensity);
-      break;
-    case 'O':
-      color = color_wt(255, 255, 100, intensity);
-      break;
-    case 'T':
-      color = color_wt(220, 100, 255, intensity);
-      break;
-    case 'S':
-      color = color_wt(120, 255, 100, intensity);
-      break;
-    case 'Z':
-      color = color_wt(255, 100, 100, intensity);
-      break;
-    case 'J':
-      color = color_wt(100, 150, 255, intensity);
-      break;
-    case 'L':
-      color = color_wt(255, 180, 70, intensity);
-      break;
+  case '0':
+    color = (Color){0, 0, 0, 0};
+    break;
+  case 'i':
+    color = SKYBLUE;
+    break;
+  case 'o':
+    color = YELLOW;
+    break;
+  case 't':
+    color = PURPLE;
+    break;
+  case 's':
+    color = GREEN;
+    break;
+  case 'z':
+    color = RED;
+    break;
+  case 'j':
+    color = BLUE;
+    break;
+  case 'l':
+    color = ORANGE;
+    break;
+  case 'I':
+    color = color_wt(100, 220, 255, intensity);
+    break;
+  case 'O':
+    color = color_wt(255, 255, 100, intensity);
+    break;
+  case 'T':
+    color = color_wt(220, 100, 255, intensity);
+    break;
+  case 'S':
+    color = color_wt(120, 255, 100, intensity);
+    break;
+  case 'Z':
+    color = color_wt(255, 100, 100, intensity);
+    break;
+  case 'J':
+    color = color_wt(100, 150, 255, intensity);
+    break;
+  case 'L':
+    color = color_wt(255, 180, 70, intensity);
+    break;
   }
 
   return color;
@@ -223,7 +241,7 @@ double time_per_animation_update(int amount_of_lines) {
 Shader glow_shader;
 RenderTexture2D game_target;
 
-const char* glow_shader_code =
+const char *glow_shader_code =
     "#version 330\n"
 
     "in vec2 fragTexCoord;\n"
@@ -286,48 +304,56 @@ void score_line_clear(const int lines_cleared) {
   update_game_stats();
 
   switch (lines_cleared) {
-    case 0:
-      break;
-    case 1:
-      game_stats.score += SCORE_1_LINE;
-      break;
-    case 2:
-      game_stats.score += SCORE_2_LINE;
-      break;
-    case 3:
-      game_stats.score += SCORE_3_LINE;
-      break;
-    case 4:
-      game_stats.score += SCORE_4_LINE;
-      break;
-    default:
-      break;
+  case 0:
+    break;
+  case 1:
+    game_stats.score += SCORE_1_LINE;
+    break;
+  case 2:
+    game_stats.score += SCORE_2_LINE;
+    break;
+  case 3:
+    game_stats.score += SCORE_3_LINE;
+    break;
+  case 4:
+    game_stats.score += SCORE_4_LINE;
+    break;
+  default:
+    break;
   }
 }
 
 // ============================================================
 // LOGIC & MECHANICS
 // ============================================================
+// for. dec.
+void lose();
 
 bool check_overlap(Piece p, Brick game_grid[GAME_GRID_LENGTH]) {
   for (int j = 0; j < PIECE_GRID_SIZE; j++) {
     for (int i = 0; i < PIECE_GRID_SIZE; i++) {
-      if (p.grid[j * PIECE_GRID_SIZE + i] == '0') continue;
+      if (p.grid[j * PIECE_GRID_SIZE + i] == '0')
+        continue;
       int xprime = i + p.x;
       int yprime = j + p.y;
-      if (xprime < 0) return true;
-      if (xprime >= GAME_GRID_WIDTH) return true;
-      if (yprime >= GAME_GRID_HEIGHT) return true;
-      if (yprime < 0) continue;
-      if (game_grid[(yprime)*GAME_GRID_WIDTH + (xprime)] != '0') return true;
+      if (xprime < 0)
+        return true;
+      if (xprime >= GAME_GRID_WIDTH)
+        return true;
+      if (yprime >= GAME_GRID_HEIGHT)
+        return true;
+      if (yprime < 0)
+        continue;
+      if (game_grid[(yprime)*GAME_GRID_WIDTH + (xprime)] != '0')
+        return true;
     }
   }
   return false;
 }
 
-void rotate_piece(Piece* p, Brick game_grid[GAME_GRID_LENGTH]) {
-  float rotcen_x = 1.5f;  // rotation center
-  float rotcen_y = 1.5f;  // rotation center
+void rotate_piece(Piece *p, Brick game_grid[GAME_GRID_LENGTH]) {
+  float rotcen_x = 1.5f; // rotation center
+  float rotcen_y = 1.5f; // rotation center
   Piece rotated_piece = {.x = p->x, .y = p->y};
   for (int j = 0; j < PIECE_GRID_SIZE; j++) {
     for (int i = 0; i < PIECE_GRID_SIZE; i++) {
@@ -338,7 +364,8 @@ void rotate_piece(Piece* p, Brick game_grid[GAME_GRID_LENGTH]) {
           p->grid[j * PIECE_GRID_SIZE + i];
     }
   }
-  if (check_overlap(rotated_piece, game_grid)) return;
+  if (check_overlap(rotated_piece, game_grid))
+    return;
   strcpy(p->grid, rotated_piece.grid);
 }
 
@@ -353,22 +380,29 @@ void mark_row_for_deletion(int row, Brick game_grid[GAME_GRID_LENGTH],
                            Brick game_modification_grid[GAME_GRID_LENGTH]) {
   for (int i = 0; i < GAME_GRID_WIDTH; i++) {
     game_modification_grid[row * GAME_GRID_WIDTH + i] =
-        'X';  // indicates that the corrosponding brick is to be removed
+        'X'; // indicates that the corrosponding brick is to be removed
   }
 }
 
 void move_rows_down(Brick game_grid[GAME_GRID_LENGTH],
-                    Brick game_modification_grid[GAME_GRID_LENGTH]) {
+                    Brick in_game_modification_grid[GAME_GRID_LENGTH]) {
   /*
-   * Assumes removed bricks are rectangular (& connected), covering one
-   * GAME_GRID_WIDTH
+   * WARNING! RECURSIVE DESIGN
+   *
    */
   Brick copy[GAME_GRID_LENGTH];
   strcpy(copy, game_grid);
+
+  Brick game_modification_grid[GAME_GRID_LENGTH];
+  strcpy(game_modification_grid, in_game_modification_grid);
   int amount_of_removed_bricks = 0;
   int y_of_lowest_removed_brick = -1;
   for (int j = 0; j < GAME_GRID_HEIGHT; j++) {
-    if (game_modification_grid[j * GAME_GRID_WIDTH] != 'X') continue;
+    if (game_modification_grid[j * GAME_GRID_WIDTH] != 'X') {
+      if (amount_of_removed_bricks == 0)
+        continue;
+      break;
+    }
     amount_of_removed_bricks++;
     y_of_lowest_removed_brick = j;
   }
@@ -377,10 +411,18 @@ void move_rows_down(Brick game_grid[GAME_GRID_LENGTH],
     for (int i = 0; i < GAME_GRID_WIDTH; i++) {
       copy[(j + amount_of_removed_bricks) * GAME_GRID_WIDTH + i] =
           game_grid[j * GAME_GRID_WIDTH + i];
+      game_modification_grid[(j + amount_of_removed_bricks) * GAME_GRID_WIDTH +
+                             i] = '0';
     }
   }
+
   // apply changes
   strcpy(game_grid, copy);
+
+  // move remaining rows
+  // TODO: remove shitty recursion solution
+  if (amount_of_removed_bricks != 0)
+    move_rows_down(game_grid, game_modification_grid);
 }
 
 int clear_lines(Brick game_grid[GAME_GRID_LENGTH],
@@ -392,14 +434,14 @@ int clear_lines(Brick game_grid[GAME_GRID_LENGTH],
       // empty)
       if (game_grid[row * GAME_GRID_WIDTH + i] == '0' ||
           game_modification_grid[row * GAME_GRID_WIDTH + i] == 'X')
-        break;  // break if not a brick
+        break; // break if not a brick
       if (i == GAME_GRID_WIDTH - 1) {
         mark_row_for_deletion(row, game_grid, game_modification_grid);
         // move_rows_down(row, game_grid);  // move rows above down
         lines_cleared++;
         row = 0;
-        i = 0;  // restart
-      }  // delete row if the last tile is a brick
+        i = 0; // restart
+      } // delete row if the last tile is a brick
     }
   }
   // change to animation state
@@ -410,11 +452,16 @@ int clear_lines(Brick game_grid[GAME_GRID_LENGTH],
 bool add_piece_to_gamegrid(Piece p, Brick game_grid[GAME_GRID_LENGTH]) {
   for (int j = 0; j < PIECE_GRID_SIZE; j++) {
     for (int i = 0; i < PIECE_GRID_SIZE; i++) {
-      if (p.grid[j * PIECE_GRID_SIZE + i] == '0') continue;
-      if (j + p.y < 0) return true;
-      if (i + p.x < 0) continue;
-      if (i + p.x >= GAME_GRID_WIDTH) continue;
-      if (j + p.y >= GAME_GRID_HEIGHT) continue;
+      if (p.grid[j * PIECE_GRID_SIZE + i] == '0')
+        continue;
+      if (j + p.y < 0)
+        return true;
+      if (i + p.x < 0)
+        continue;
+      if (i + p.x >= GAME_GRID_WIDTH)
+        continue;
+      if (j + p.y >= GAME_GRID_HEIGHT)
+        continue;
       game_grid[(j + p.y) * GAME_GRID_WIDTH + (i + p.x)] =
           p.grid[j * PIECE_GRID_SIZE + i];
     }
@@ -428,31 +475,34 @@ bool add_piece_to_gamegrid(Piece p, Brick game_grid[GAME_GRID_LENGTH]) {
   return false;
 }
 
-void reset_piece_position(Piece* p) {
+void reset_piece_position(Piece *p) {
   p->x = 2;
   p->y = -3;
 }
 
 // true if lost, false if nothing
-bool move_to_next_piece(Piece* controlled_piece,
+bool move_to_next_piece(Piece *controlled_piece,
                         Brick game_grid[GAME_GRID_LENGTH]) {
-  if (add_piece_to_gamegrid(*controlled_piece, game_grid)) return true;
+  if (add_piece_to_gamegrid(*controlled_piece, game_grid))
+    return true;
   reset_piece_position(controlled_piece);
   randomize_shape(controlled_piece->grid);
   switch_count = 0;
   return false;
 }
 
-void smash(Piece* p, Brick game_grid[GAME_GRID_LENGTH]) {
+void smash(Piece *p, Brick game_grid[GAME_GRID_LENGTH]) {
   while (!check_next_frame(*p, game_grid)) {
     p->y++;
     score_fast_fall();
   }
-  if (move_to_next_piece(p, game_grid)) gamestate = GAME_LOST;
+  if (move_to_next_piece(p, game_grid))
+    lose();
 }
 
 void switch_controlled_piece() {
-  if (switch_count >= AMOUNT_OF_SWITCHES_PER_DROP) return;
+  if (switch_count >= AMOUNT_OF_SWITCHES_PER_DROP)
+    return;
   switch_count++;
   Brick buffer[PIECE_GRID_LENGTH];
   strcpy(buffer, controlled_piece.grid);
@@ -467,13 +517,14 @@ void switch_controlled_piece() {
 
 void draw_brick_on_grid(const int x_in, const int y_in, const Brick id,
                         bool ghost) {
-  int padding = 2;  // pixels
+  int padding = 2; // pixels
   int x = x_in * BRICK_SIZE_PIXELS + game_viewport_x + padding;
   int y = y_in * BRICK_SIZE_PIXELS + game_viewport_y + padding;
   int width = BRICK_SIZE_PIXELS - padding;
   int height = BRICK_SIZE_PIXELS - padding;
   if (ghost) {
-    if (id == '0') return;
+    if (id == '0')
+      return;
     DrawRectangle(x, y, width, height, (Color){255, 255, 255, 100});
     return;
   }
@@ -485,7 +536,7 @@ void draw_brick(const int x, const int y, const int width, const int height,
   DrawRectangle(x, y, width, height, color_from_id(id, 1));
 }
 
-void draw_grid_on_grid(const Brick* const grid, const size_t width,
+void draw_grid_on_grid(const Brick *const grid, const size_t width,
                        const size_t height, const int x, const int y,
                        bool ghost) {
   for (int j = 0; j < height; j++) {
@@ -495,7 +546,7 @@ void draw_grid_on_grid(const Brick* const grid, const size_t width,
   }
 }
 
-void draw_grid(const Brick* const grid, const size_t width, const size_t height,
+void draw_grid(const Brick *const grid, const size_t width, const size_t height,
                const size_t size_pixels, const int x, const int y) {
   for (int j = 0; j < height; j++) {
     for (int i = 0; i < width; i++) {
@@ -524,11 +575,11 @@ void draw_drop_line(const Piece p) {
 }
 
 void draw_borders() {
-  DrawRectangleLinesEx(
-      (Rectangle){(float)game_viewport_x, (float)game_viewport_y,
-                  GAME_GRID_WIDTH * BRICK_SIZE_PIXELS,
-                  GAME_GRID_HEIGHT * BRICK_SIZE_PIXELS},
-      4, WHITE);
+  DrawRectangleLinesEx((Rectangle){(float)game_viewport_x,
+                                   (float)game_viewport_y,
+                                   GAME_GRID_WIDTH * BRICK_SIZE_PIXELS,
+                                   GAME_GRID_HEIGHT * BRICK_SIZE_PIXELS},
+                       4, WHITE);
 }
 
 void draw_prediction_piece(Piece p) {
@@ -555,13 +606,15 @@ void game_animation_line_clear1_update(
   int blocks_removed = 0;
   for (int col = 0; col < GAME_GRID_WIDTH; col++) {
     for (int j = 0; j < GAME_GRID_HEIGHT; j++) {
-      if (game_grid[j * GAME_GRID_WIDTH + col] == '0') continue;
+      if (game_grid[j * GAME_GRID_WIDTH + col] == '0')
+        continue;
       if (game_modification_grid[j * GAME_GRID_WIDTH + col] == 'X') {
         game_grid[j * GAME_GRID_WIDTH + col] = '0';
         blocks_removed++;
       }
     }
-    if (blocks_removed != 0) break;
+    if (blocks_removed != 0)
+      break;
   }
 
   game_viewport_x =
@@ -584,7 +637,8 @@ void game_animation_line_clear1_update(
 
 void update() {
   if (check_next_frame(controlled_piece, game_grid)) {
-    if (move_to_next_piece(&controlled_piece, game_grid)) gamestate = GAME_LOST;
+    if (move_to_next_piece(&controlled_piece, game_grid))
+      lose();
   } else
     controlled_piece.y++;
   score_slow_fall();
@@ -600,9 +654,11 @@ void draw() {
 
   draw_borders();
 
-  if (ENABLE_FALL_LINE) draw_drop_line(controlled_piece);
+  if (ENABLE_FALL_LINE)
+    draw_drop_line(controlled_piece);
 
-  if (ENABLE_PREDICTION) draw_prediction_piece(controlled_piece);
+  if (ENABLE_PREDICTION)
+    draw_prediction_piece(controlled_piece);
 
   draw_piece_on_grid(controlled_piece, false);
 
@@ -654,24 +710,9 @@ void draw() {
   EndDrawing();
 }
 
-void animate_line_clear(void) {}
-
-void reset(void) {
-  zero_grid(game_grid, GAME_GRID_LENGTH);
-
-  controlled_piece.x = 2;
-  controlled_piece.y = -3;
-  randomize_shape(controlled_piece.grid);
-  randomize_shape(next_piece_grid);
-
-  game_stats.score = 0;
-  game_stats.drop_interval = DEFAULT_TIME_PER_UPDATE;
-  game_stats.level = 0;
-  game_stats.lines_cleared = 0;
-
-  time_since_update = 0;
-
-  gamestate = GAME_PLAYING;
+void lose() {
+  gamestate = GAME_LOST;
+  PlaySound(soundfx.game_over);
 }
 
 void init_globals(void) {
@@ -716,21 +757,29 @@ void shader_init_function(void) {
                  SHADER_UNIFORM_VEC2);
 }
 
+void reset(void) { init_globals(); }
+
 void handle_input(void) {
   if (IsKeyPressed(KEY_UP)) {
     rotate_piece(&controlled_piece, game_grid);
+    PlaySound(soundfx.rotate);
   }
   if (IsKeyPressed(KEY_DOWN)) {
     smash(&controlled_piece, game_grid);
+    PlaySound(soundfx.place);
   }
 
   if (IsKeyPressed(KEY_LEFT)) {
     controlled_piece.x--;
-    if (check_overlap(controlled_piece, game_grid)) controlled_piece.x++;
+    if (check_overlap(controlled_piece, game_grid))
+      controlled_piece.x++;
+    PlaySound(soundfx.move);
   }
   if (IsKeyPressed(KEY_RIGHT)) {
     controlled_piece.x++;
-    if (check_overlap(controlled_piece, game_grid)) controlled_piece.x--;
+    if (check_overlap(controlled_piece, game_grid))
+      controlled_piece.x--;
+    PlaySound(soundfx.move);
   }
   if (IsKeyPressed(KEY_C)) {
     switch_controlled_piece();
@@ -741,7 +790,7 @@ void handle_input(void) {
 }
 
 int main(void) {
-  srand(time(NULL));  // seed time for RNG
+  srand(time(NULL)); // seed time for RNG
 
   init_globals();
 
@@ -750,41 +799,60 @@ int main(void) {
 
   shader_init_function();
 
+  InitAudioDevice();
+
+  has_audio_output = IsAudioDeviceReady();
+
+  soundfx = (SoundFX){
+      .move = LoadSound("assets/fx/move.wav"),
+      .rotate = LoadSound("assets/fx/rotate.wav"),
+      .place = LoadSound("assets/fx/place.wav"),
+      .line_clear = LoadSound("assets/fx/line_clear.wav"),
+      .tetris = LoadSound("assets/fx/tetris.wav"),
+      .game_over = LoadSound("assets/fx/lose.wav"),
+  };
+
+  music = (Musica){.track1 = LoadSound("assets/music/track1.wav")};
+
   while (!WindowShouldClose()) {
     switch (gamestate) {
-      case GAME_PLAYING: {
-        time_since_update += GetFrameTime();
+    case GAME_PLAYING: {
+      time_since_update += GetFrameTime();
 
-        if (time_since_update >= game_stats.drop_interval) {
-          time_since_update -= game_stats.drop_interval;
-          update();
-        }
+      if (time_since_update >= game_stats.drop_interval) {
+        time_since_update -= game_stats.drop_interval;
+        update();
+      }
 
-        handle_input();
-        break;
-      }
-      // animations use a different timer
-      case GAME_ANIMATION_LINE_CLEAR1: {
-        // should remove blocks to be cleared.
-        // Blocks to be removed should have ID 'X'
-        // Two copies of game_grid. One drawn, and one
-        // indicating bricks to be removed
-        double frametime = GetFrameTime();
-        time_since_animation_update += frametime;
-        time_since_animation_start += frametime;
+      handle_input();
+      break;
+    }
+    case GAME_LOST: {
+      handle_input();
+      break;
+    }
+    // animations use a different timer
+    case GAME_ANIMATION_LINE_CLEAR1: {
+      // should remove blocks to be cleared.
+      // Blocks to be removed should have ID 'X'
+      // Two copies of game_grid. One drawn, and one
+      // indicating bricks to be removed
+      double frametime = GetFrameTime();
+      time_since_animation_update += frametime;
+      time_since_animation_start += frametime;
 
-        if (time_since_animation_update >=
-            time_per_animation_update(animation_lines_being_cleared)) {
-          time_since_animation_update -=
-              time_per_animation_update(animation_lines_being_cleared);
-          game_animation_line_clear1_update(game_grid, game_modification_grid,
-                                            animation_lines_being_cleared);
-        }
-        break;
+      if (time_since_animation_update >=
+          time_per_animation_update(animation_lines_being_cleared)) {
+        time_since_animation_update -=
+            time_per_animation_update(animation_lines_being_cleared);
+        game_animation_line_clear1_update(game_grid, game_modification_grid,
+                                          animation_lines_being_cleared);
       }
-      case GAME_ANIMATION_SMASH: {
-        break;
-      }
+      break;
+    }
+    case GAME_ANIMATION_SMASH: {
+      break;
+    }
     }
 
     // Draw
@@ -793,7 +861,7 @@ int main(void) {
 
   UnloadShader(glow_shader);
   UnloadRenderTexture(game_target);
-
+  CloseAudioDevice();
   CloseWindow();
 
   return 0;
