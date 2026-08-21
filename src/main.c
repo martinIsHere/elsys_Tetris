@@ -9,7 +9,7 @@
 /*
  * TODO:
  * add animation *
- * add music
+ * music
  * add soundfx
  *
  */
@@ -129,6 +129,7 @@ typedef struct SoundFX {
 
 typedef struct Musica {
   Music track1;
+  Music track2;
 } Musica;
 
 SoundFX soundfx;
@@ -816,7 +817,8 @@ int main(void) {
       .game_over = LoadSound("assets/fx/lose.wav"),
   };
 
-  playlist = (Musica){.track1 = LoadMusicStream("assets/music/track1.wav")};
+  playlist = (Musica){.track1 = LoadMusicStream("assets/music/track1.wav"),
+                      .track2 = LoadMusicStream("assets/music/track2.wav")};
   playlist.track1.looping = true;
   PlayMusicStream(playlist.track1);
 
@@ -875,6 +877,7 @@ int main(void) {
   UnloadSound(soundfx.tetris);
   UnloadSound(soundfx.game_over);
   UnloadMusicStream(playlist.track1);
+  UnloadMusicStream(playlist.track2);
   CloseAudioDevice();
   CloseWindow();
 
