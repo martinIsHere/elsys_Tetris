@@ -128,11 +128,11 @@ typedef struct SoundFX {
 } SoundFX;
 
 typedef struct Musica {
-  Sound track1;
+  Music track1;
 } Musica;
 
 SoundFX soundfx;
-Musica music;
+Musica playlist;
 
 bool has_audio_output;
 
@@ -308,15 +308,19 @@ void score_line_clear(const int lines_cleared) {
     break;
   case 1:
     game_stats.score += SCORE_1_LINE;
+    PlaySound(soundfx.line_clear);
     break;
   case 2:
     game_stats.score += SCORE_2_LINE;
+    PlaySound(soundfx.line_clear);
     break;
   case 3:
     game_stats.score += SCORE_3_LINE;
+    PlaySound(soundfx.line_clear);
     break;
   case 4:
     game_stats.score += SCORE_4_LINE;
+    PlaySound(soundfx.tetris);
     break;
   default:
     break;
@@ -437,7 +441,7 @@ int clear_lines(Brick game_grid[GAME_GRID_LENGTH],
         break; // break if not a brick
       if (i == GAME_GRID_WIDTH - 1) {
         mark_row_for_deletion(row, game_grid, game_modification_grid);
-        // move_rows_down(row, game_grid);  // move rows above down
+        // move rows above down
         lines_cleared++;
         row = 0;
         i = 0; // restart
@@ -812,9 +816,12 @@ int main(void) {
       .game_over = LoadSound("assets/fx/lose.wav"),
   };
 
-  music = (Musica){.track1 = LoadSound("assets/music/track1.wav")};
+  playlist = (Musica){.track1 = LoadMusicStream("assets/music/track1.wav")};
+  playlist.track1.looping = true;
+  PlayMusicStream(playlist.track1);
 
   while (!WindowShouldClose()) {
+    UpdateMusicStream(playlist.track1);
     switch (gamestate) {
     case GAME_PLAYING: {
       time_since_update += GetFrameTime();
@@ -861,6 +868,13 @@ int main(void) {
 
   UnloadShader(glow_shader);
   UnloadRenderTexture(game_target);
+  UnloadSound(soundfx.move);
+  UnloadSound(soundfx.rotate);
+  UnloadSound(soundfx.place);
+  UnloadSound(soundfx.line_clear);
+  UnloadSound(soundfx.tetris);
+  UnloadSound(soundfx.game_over);
+  UnloadMusicStream(playlist.track1);
   CloseAudioDevice();
   CloseWindow();
 
